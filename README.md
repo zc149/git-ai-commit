@@ -10,6 +10,7 @@ AI를 활용하여 Git 커밋 메시지를 자동으로 생성하는 CLI 도구�
 - 🚀 Groq LLM 제공자 지원 (무료, 빠름)
 - 📊 스마트한 커밋 타입 및 scope 추천
 - 🎨 사용자 친화적인 TUI 인터페이스
+- 🌍 다국어 지원 (한국어, 영어)
 
 ## 지원하는 LLM
 
@@ -48,6 +49,7 @@ export AI_COMMIT_GROQ_API_KEY="your-groq-api-key"
 ```bash
 export AI_COMMIT_MODEL="groq"  # 기본값 (현재 유일한 옵션)
 export AI_COMMIT_DETAIL="medium"  # low, medium, high (기본값: medium)
+export AI_COMMIT_LANG="en"  # en, ko (기본값: en)
 ```
 
 ### 영구 설정 (선택 사항)
@@ -69,6 +71,29 @@ git add .
 ```bash
 ./git-ai-commit
 ```
+
+### 언어 설정
+
+사용 언어를 설정할 수 있습니다 (기본값: 영어):
+
+#### 명령줄 옵션으로 설정 (우선순위 1)
+
+```bash
+# 영어 (기본)
+./git-ai-commit --lang en
+
+# 한국어
+./git-ai-commit --lang ko
+```
+
+#### 환경변수로 설정 (우선순위 2)
+
+```bash
+export AI_COMMIT_LANG="ko"
+./git-ai-commit
+```
+
+**우선순위:** 명령줄 옵션 > 환경 변수 > 기본값(`en`)
 
 ### 디테일 레벨 설정
 
@@ -114,6 +139,7 @@ AI가 생성한 3개의 커밋 메시지 후보 중 하나를 선택하거나, �
 | `AI_COMMIT_GROQ_API_KEY` | Groq API 키 | - | ✅ |
 | `AI_COMMIT_MODEL` | 사용할 LLM 모델 (현재는 groq만 지원) | `groq` | ❌ |
 | `AI_COMMIT_DETAIL` | 디테일 레벨 (`low`, `medium`, `high`) | `medium` | ❌ |
+| `AI_COMMIT_LANG` | 언어 설정 (`en`, `ko`) | `en` | ❌ |
 
 ### API 키 우선순위
 
@@ -187,6 +213,20 @@ q) 종료
 ✨ 커밋 완료!
 ```
 
+### 다양한 언어 사용
+
+```bash
+# 영어 메시지 생성 (기본)
+./git-ai-commit --lang en
+
+# 한국어 메시지 생성
+./git-ai-commit --lang ko
+
+# 환경변수로 설정
+export AI_COMMIT_LANG="ko"
+./git-ai-commit
+```
+
 ### 다양한 디테일 레벨 사용
 
 ```bash
@@ -199,6 +239,39 @@ q) 종료
 # 환경변수로 설정
 export AI_COMMIT_DETAIL="high"
 ./git-ai-commit
+```
+
+### 영어 모드 예시
+
+```bash
+./git-ai-commit --lang en
+
+🤖 Git AI Commit
+
+✅ 1 file staged
+  - main.go
+
+📊 Recommended commit type: refactor
+🤖 Using model: groq
+📝 Detail level: medium
+
+🔄 AI is generating commit messages...
+✅ Commit message candidates generated.
+
+=== Commit Message Candidates ===
+1) refactor(core): improve message generation logic
+2) refactor(generator): optimize diff analysis
+3) refactor: refactor commit message generation process
+c) Custom input
+q) Quit
+
+Select (1-3 or c/q): 1
+
+🎯 Commit message: refactor(core): improve message generation logic
+
+🚀 Executing commit...
+
+✨ Commit complete!
 ```
 
 ## 프로젝트 구조
