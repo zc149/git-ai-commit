@@ -7,24 +7,40 @@ import (
 )
 
 // GeneratePrompt는 LLM에 전달할 프롬프트를 생성합니다.
-func GeneratePrompt(diff *git.DiffResult, detail string) string {
+func GeneratePrompt(diff *git.DiffResult, detail string, lang string) string {
 	var builder strings.Builder
 
 	// 헤더
-	builder.WriteString("다음 정보를 기반으로 Conventional Commit 메시지를 생성하세요.\n\n")
+	if lang == "ko" {
+		builder.WriteString("다음 정보를 기반으로 Conventional Commit 메시지를 생성하세요.\n\n")
+	} else {
+		builder.WriteString("Generate Conventional Commit messages based on the following information.\n\n")
+	}
 
 	// 추천 타입
-	builder.WriteString(fmt.Sprintf("추천 타입: %s\n", diff.CommitType))
+	if lang == "ko" {
+		builder.WriteString(fmt.Sprintf("추천 타입: %s\n", diff.CommitType))
+	} else {
+		builder.WriteString(fmt.Sprintf("Recommended type: %s\n", diff.CommitType))
+	}
 
 	// 추천 scope
 	if len(diff.Scopes) > 0 {
-		builder.WriteString(fmt.Sprintf("추천 scope: %s\n", strings.Join(diff.Scopes, ", ")))
+		if lang == "ko" {
+			builder.WriteString(fmt.Sprintf("추천 scope: %s\n", strings.Join(diff.Scopes, ", ")))
+		} else {
+			builder.WriteString(fmt.Sprintf("Recommended scope: %s\n", strings.Join(diff.Scopes, ", ")))
+		}
 	}
 
 	builder.WriteString("\n")
 
 	// 변경 내용 요약
-	builder.WriteString("변경 내용 요약:\n")
+	if lang == "ko" {
+		builder.WriteString("변경 내용 요약:\n")
+	} else {
+		builder.WriteString("Changes summary:\n")
+	}
 	if len(diff.Files) == 0 {
 		builder.WriteString("변경된 파일이 없습니다.\n")
 	} else {
@@ -53,21 +69,50 @@ func GeneratePrompt(diff *git.DiffResult, detail string) string {
 	builder.WriteString("\n")
 
 	// 요구사항
-	builder.WriteString("요구사항:\n")
+	if lang == "ko" {
+		builder.WriteString("요구사항:\n")
+	} else {
+		builder.WriteString("Requirements:\n")
+	}
 	builder.WriteString("- 간결할 것\n")
-	builder.WriteString("- Conventional Commit 형식 (type(scope): message)\n")
-	builder.WriteString("- 3개의 후보 생성\n")
-	builder.WriteString("- 번호로 구분 (예: 1) feat(auth): ...)\n")
+	if lang == "ko" {
+		builder.WriteString("- Conventional Commit 형식 (type(scope): message)\n")
+	} else {
+		builder.WriteString("- Conventional Commit format (type(scope): message)\n")
+	}
+	if lang == "ko" {
+		builder.WriteString("- 3개의 후보 생성\n")
+	} else {
+		builder.WriteString("- Generate 3 candidates\n")
+	}
+	if lang == "ko" {
+		builder.WriteString("- 번호로 구분 (예: 1) feat(auth): ...)\n")
+	} else {
+		builder.WriteString("- Numbered format (e.g., 1) feat(auth): ...)\n")
+	}
 
 	// 디테일 레벨에 따른 추가 요구사항
 	switch detail {
 	case "high":
-		builder.WriteString("- 변경 내용을 자세히 설명\n")
-		builder.WriteString("- 영향받는 기능 명시\n")
+		if lang == "ko" {
+			builder.WriteString("- 변경 내용을 자세히 설명\n")
+			builder.WriteString("- 영향받는 기능 명시\n")
+		} else {
+			builder.WriteString("- Describe changes in detail\n")
+			builder.WriteString("- Mention affected features\n")
+		}
 	case "medium":
-		builder.WriteString("- 적절한 디테일 수준 유지\n")
+		if lang == "ko" {
+			builder.WriteString("- 적절한 디테일 수준 유지\n")
+		} else {
+			builder.WriteString("- Maintain appropriate detail level\n")
+		}
 	case "low":
-		builder.WriteString("- 최소한의 설명\n")
+		if lang == "ko" {
+			builder.WriteString("- 최소한의 설명\n")
+		} else {
+			builder.WriteString("- Minimal description\n")
+		}
 	}
 
 	return builder.String()
@@ -116,3 +161,4 @@ func summarizeChanges(changes string) string {
 
 	return summary
 }
+// Add language support
