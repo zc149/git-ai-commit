@@ -5,3 +5,4 @@ func TestFunction() string {
 	return "Git AI Commit 통합 테스트 성공!"
 }
 // Gemini API 테스트용 주석
+// 새로운 API 키로 테스트
