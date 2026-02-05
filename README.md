@@ -1,22 +1,19 @@
 # Git AI Commit
 
-AI를 활용하여 Git 커밋 메시지를 자동으로 생성하는 CLI 도구입니다. 다양한 LLM(Claude, OpenAI, Codex, Gemini)을 지원합니다.
+AI를 활용하여 Git 커밋 메시지를 자동으로 생성하는 CLI 도구입니다. Groq의 고성능 LLM(Llama 3.3-70B)을 사용합니다.
 
 ## 기능
 
 - ✅ Git diff 자동 분석
 - 🤖 AI 기반 커밋 메시지 생성 (Conventional Commit 형식)
 - 🎯 다중 후보 메시지 제공 및 사용자 선택
-- 🔄 다양한 LLM 제공자 지원 (Claude, OpenAI, Codex, Gemini)
+- 🚀 Groq LLM 제공자 지원 (무료, 빠름)
 - 📊 스마트한 커밋 타입 및 scope 추천
 - 🎨 사용자 친화적인 TUI 인터페이스
 
 ## 지원하는 LLM
 
-- **Claude** (Anthropic)
-- **OpenAI** (GPT-4)
-- **Codex** (OpenAI)
-- **Gemini** (Google)
+- **Groq** - Llama 3.3-70B-Versatile (완전 무료, 매우 빠름)
 
 ## 설치
 
@@ -37,30 +34,19 @@ sudo mv git-ai-commit /usr/local/bin/
 
 ### 1. 환경변수 설정
 
-#### Claude 사용
-
 ```bash
-export AI_COMMIT_CLAUDE_API_KEY="your-claude-api-key"
-export AI_COMMIT_MODEL="claude"
+export AI_COMMIT_GROQ_API_KEY="your-groq-api-key"
 ```
 
-#### OpenAI 사용
-
-```bash
-export AI_COMMIT_OPENAI_API_KEY="your-openai-api-key"
-export AI_COMMIT_MODEL="openai"
-```
-
-#### Gemini 사용
-
-```bash
-export AI_COMMIT_GEMINI_API_KEY="your-gemini-api-key"
-export AI_COMMIT_MODEL="gemini"
-```
+**Groq API 키 받는 방법:**
+1. [console.groq.com](https://console.groq.com)에서 계정 생성
+2. API Keys 메뉴에서 새 키 생성
+3. 키를 환경변수에 설정
 
 ### 선택 사항
 
 ```bash
+export AI_COMMIT_MODEL="groq"  # 기본값 (현재 유일한 옵션)
 export AI_COMMIT_DETAIL="medium"  # low, medium, high (기본값: medium)
 ```
 
@@ -68,8 +54,7 @@ export AI_COMMIT_DETAIL="medium"  # low, medium, high (기본값: medium)
 
 ```bash
 # ~/.zshrc 또는 ~/.bashrc에 추가
-echo 'export AI_COMMIT_MODEL="gemini"' >> ~/.zshrc
-echo 'export AI_COMMIT_GEMINI_API_KEY="your-api-key"' >> ~/.zshrc
+echo 'export AI_COMMIT_GROQ_API_KEY="your-api-key"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
@@ -93,27 +78,21 @@ AI가 생성한 3개의 커밋 메시지 후보 중 하나를 선택하거나, �
 
 | 변수 | 설명 | 기본값 | 필수 |
 |------|------|--------|------|
-| `AI_COMMIT_MODEL` | 사용할 LLM 모델 (`claude`, `openai`, `gemini`, `codex`) | 첫 번째 유효한 키 | ❌ |
-| `AI_COMMIT_CLAUDE_API_KEY` | Claude API 키 | - | ✅ (Claude 사용시) |
-| `AI_COMMIT_OPENAI_API_KEY` | OpenAI API 키 | - | ✅ (OpenAI 사용시) |
-| `AI_COMMIT_GEMINI_API_KEY` | Gemini API 키 | - | ✅ (Gemini 사용시) |
+| `AI_COMMIT_GROQ_API_KEY` | Groq API 키 | - | ✅ |
+| `AI_COMMIT_MODEL` | 사용할 LLM 모델 (현재는 groq만 지원) | `groq` | ❌ |
 | `AI_COMMIT_DETAIL` | 디테일 레벨 (`low`, `medium`, `high`) | `medium` | ❌ |
 
 ### API 키 우선순위
 
-각 제공자별로 여러 환경 변수 이름을 지원합니다:
+Groq는 다음 환경 변수 중 첫 번째로 설정된 값을 사용합니다:
+- `AI_COMMIT_GROQ_API_KEY` > `GROQ_API_KEY`
 
-- **Claude**: `AI_COMMIT_CLAUDE_API_KEY` > `CLAUDE_API_KEY` > `ANTHROPIC_API_KEY`
-- **OpenAI**: `AI_COMMIT_OPENAI_API_KEY` > `OPENAI_API_KEY`
-- **Gemini**: `AI_COMMIT_GEMINI_API_KEY` > `GEMINI_API_KEY` > `GOOGLE_API_KEY`
-- **Codex**: `AI_COMMIT_CODEX_API_KEY` > `CODEX_API_KEY` > `OPENAI_API_KEY`
+## 지원하는 모델
 
-## 지원하는 모델 (Code-optimized)
-
-- `claude` - Claude 3.5 Sonnet
-- `openai` - GPT-4o-mini
-- `codex` - Code Davinci 003
-- `gemini` - Gemini 2.0 Flash
+- `groq` - Llama 3.3-70B-Versatile
+  - 완전 무료
+  - 매우 빠른 추론 속도
+  - 높은 성능
 
 ## Conventional Commit 형식
 
@@ -153,6 +132,7 @@ git add main.go
   - main.go
 
 📊 추천 커밋 타입: refactor
+🤖 사용 모델: groq
 
 🔄 AI가 커밋 메시지를 생성 중...
 ✅ 커밋 메시지 후보가 생성되었습니다.
@@ -164,27 +144,13 @@ git add main.go
 c) 사용자 직접 입력
 q) 종료
 
-선택 (1-{} 또는 c/q): 1
+선택 (1-3 또는 c/q): 1
 
 🎯 커밋 메시지: refactor(core): 메시지 생성 로직 개선
 
 🚀 커밋을 실행합니다...
 
 ✨ 커밋 완료!
-```
-
-### 다른 모델 사용
-
-```bash
-# OpenAI
-export AI_COMMIT_MODEL="openai"
-export AI_COMMIT_OPENAI_API_KEY="sk-..."
-./git-ai-commit
-
-# Gemini
-export AI_COMMIT_MODEL="gemini"
-export AI_COMMIT_GEMINI_API_KEY="..."
-./git-ai-commit
 ```
 
 ### 높은 디테일 레벨
@@ -209,13 +175,12 @@ git-ai-commit/
 │   │   └── diff.go       # git diff 파싱
 │   ├── llm/
 │   │   ├── provider.go   # LLM 제공자 인터페이스
-│   │   ├── claude.go     # Claude 구현
-│   │   ├── openai.go     # OpenAI 구현
-│   │   ├── codex.go      # Codex 구현
-│   │   ├── gemini.go     # Gemini 구현
+│   │   ├── groq.go       # Groq 구현
 │   │   └── utils.go      # 유틸리티 함수
 │   ├── model/
 │   │   └── types.go      # 공통 타입 정의
+│   ├── config/
+│   │   └── config.go     # 설정 관리
 │   └── ui/
 │       └── selector.go   # 사용자 선택 인터페이스
 ├── docs/
