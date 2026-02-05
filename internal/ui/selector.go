@@ -32,7 +32,7 @@ func (s *Selector) Select(messages []string) (string, error) {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
-		fmt.Print("\n선택 (1-{} 또는 c/q): ", len(messages))
+		fmt.Printf("\n선택 (1-%d 또는 c/q): ", len(messages))
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			return "", fmt.Errorf("입력 읽기 실패: %w", err)
