@@ -18,9 +18,9 @@ func NewGenerator(provider llm.Provider) *Generator {
 }
 
 // Generate는 diff를 분석하여 커밋 메시지 후보들을 생성합니다.
-func (g *Generator) Generate(diff *git.DiffResult, detail string) ([]string, error) {
+func (g *Generator) Generate(diff *git.DiffResult, detail string, lang string) ([]string, error) {
 	// 프롬프트 생성
-	prompt := GeneratePrompt(diff, detail)
+	prompt := GeneratePrompt(diff, detail, lang)
 
 	// LLM 호출
 	messages, err := g.provider.Generate(prompt)
@@ -30,3 +30,4 @@ func (g *Generator) Generate(diff *git.DiffResult, detail string) ([]string, err
 
 	return messages, nil
 }
+// Add language support
