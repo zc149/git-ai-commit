@@ -28,7 +28,7 @@ func (s *Selector) Select(messages []string) (string, error) {
 
 	fmt.Println("\n" + s.getMessage("header_candidates"))
 	for i, msg := range messages {
-		fmt.Printf("%d) %s\n", i+1, msg)
+		s.displayFormattedMessage(i+1, msg)
 	}
 	fmt.Println(s.getMessage("option_custom"))
 	fmt.Println(s.getMessage("option_quit"))
@@ -184,3 +184,25 @@ func (s *Selector) formatPrompt(count int) string {
 	prompt := s.getMessage("prompt_select")
 	return fmt.Sprintf(prompt, count)
 }
+
+// displayFormattedMessage는 메시지를 포맷팅하여 표시합니다.
+func (s *Selector) displayFormattedMessage(index int, msg string) {
+	lines := strings.Split(msg, "\n")
+
+	// 첫 번째 줄 (번호와 함께)
+	if len(lines) > 0 {
+		fmt.Printf("%d) %s\n", index, lines[0])
+	}
+
+	// 나머지 줄들 (들여쓰기 적용)
+	indent := fmt.Sprintf("    ")
+	for i := 1; i < len(lines); i++ {
+		line := strings.TrimSpace(lines[i])
+		if line != "" {
+			fmt.Printf("%s%s\n", indent, line)
+		} else {
+			fmt.Println()
+		}
+	}
+}
+// Add structured format for high detail level
