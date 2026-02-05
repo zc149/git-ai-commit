@@ -15,8 +15,6 @@ func NewProvider(model string, apiKey string) (Provider, error) {
 		return NewOpenAIProvider(apiKey), nil
 	case "codex":
 		return NewCodexProvider(apiKey), nil
-	case "glm":
-		return NewGLMProvider(apiKey), nil
 	case "gemini":
 		return NewGeminiProvider(apiKey)
 	default:

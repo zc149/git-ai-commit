@@ -20,7 +20,6 @@ type APIKeys struct {
 	Claude string
 	OpenAI string
 	Gemini string
-	GLM    string
 	Codex  string
 }
 
@@ -32,7 +31,6 @@ func Load() (*Config, error) {
 			Claude: getEnvWithFallback("AI_COMMIT_CLAUDE_API_KEY", "CLAUDE_API_KEY", "ANTHROPIC_API_KEY"),
 			OpenAI: getEnvWithFallback("AI_COMMIT_OPENAI_API_KEY", "OPENAI_API_KEY"),
 			Gemini: getEnvWithFallback("AI_COMMIT_GEMINI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"),
-			GLM:    getEnvWithFallback("AI_COMMIT_GLM_API_KEY", "GLM_API_KEY", "ZAI_API_KEY"),
 			Codex:  getEnvWithFallback("AI_COMMIT_CODEX_API_KEY", "CODEX_API_KEY", "OPENAI_API_KEY"),
 		},
 		Model: getEnvWithFallback("AI_COMMIT_MODEL", "AI_COMMIT_LLM_MODEL"),
@@ -42,7 +40,7 @@ func Load() (*Config, error) {
 }
 
 // GetFirstAvailableModel는 첫 번째 유효한 API 키를 가진 모델을 반환합니다.
-// 우선순위: Claude > OpenAI > Gemini > GLM > Codex
+// 우선순위: Claude > OpenAI > Gemini > Codex
 func (c *Config) GetFirstAvailableModel() string {
 	if c.Model != "" {
 		return c.Model
@@ -56,9 +54,6 @@ func (c *Config) GetFirstAvailableModel() string {
 	}
 	if c.APIKeys.Gemini != "" {
 		return "gemini"
-	}
-	if c.APIKeys.GLM != "" {
-		return "glm"
 	}
 	if c.APIKeys.Codex != "" {
 		return "codex"
@@ -87,11 +82,6 @@ func (c *Config) GetAPIKey(model string) (string, error) {
 			return "", fmt.Errorf("Gemini API key not found")
 		}
 		return c.APIKeys.Gemini, nil
-	case "glm":
-		if c.APIKeys.GLM == "" {
-			return "", fmt.Errorf("GLM API key not found")
-		}
-		return c.APIKeys.GLM, nil
 	case "codex":
 		if c.APIKeys.Codex == "" {
 			return "", fmt.Errorf("Codex API key not found")

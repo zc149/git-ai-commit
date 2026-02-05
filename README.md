@@ -1,13 +1,13 @@
 # Git AI Commit
 
-AI를 활용하여 Git 커밋 메시지를 자동으로 생성하는 CLI 도구입니다. 다양한 LLM(Claude, OpenAI, Codex, GLM, Gemini)을 지원합니다.
+AI를 활용하여 Git 커밋 메시지를 자동으로 생성하는 CLI 도구입니다. 다양한 LLM(Claude, OpenAI, Codex, Gemini)을 지원합니다.
 
 ## 기능
 
 - ✅ Git diff 자동 분석
 - 🤖 AI 기반 커밋 메시지 생성 (Conventional Commit 형식)
 - 🎯 다중 후보 메시지 제공 및 사용자 선택
-- 🔄 다양한 LLM 제공자 지원 (Claude, OpenAI, Codex, GLM, Gemini)
+- 🔄 다양한 LLM 제공자 지원 (Claude, OpenAI, Codex, Gemini)
 - 📊 스마트한 커밋 타입 및 scope 추천
 - 🎨 사용자 친화적인 TUI 인터페이스
 
@@ -16,7 +16,6 @@ AI를 활용하여 Git 커밋 메시지를 자동으로 생성하는 CLI 도구�
 - **Claude** (Anthropic)
 - **OpenAI** (GPT-4)
 - **Codex** (OpenAI)
-- **GLM** (Zhipu AI)
 - **Gemini** (Google)
 
 ## 설치
@@ -59,13 +58,6 @@ export AI_COMMIT_GEMINI_API_KEY="your-gemini-api-key"
 export AI_COMMIT_MODEL="gemini"
 ```
 
-#### GLM 사용
-
-```bash
-export AI_COMMIT_GLM_API_KEY="your-glm-api-key"
-export AI_COMMIT_MODEL="glm"
-```
-
 ### 선택 사항
 
 ```bash
@@ -101,11 +93,10 @@ AI가 생성한 3개의 커밋 메시지 후보 중 하나를 선택하거나, �
 
 | 변수 | 설명 | 기본값 | 필수 |
 |------|------|--------|------|
-| `AI_COMMIT_MODEL` | 사용할 LLM 모델 (`claude`, `openai`, `gemini`, `glm`, `codex`) | 첫 번째 유효한 키 | ❌ |
+| `AI_COMMIT_MODEL` | 사용할 LLM 모델 (`claude`, `openai`, `gemini`, `codex`) | 첫 번째 유효한 키 | ❌ |
 | `AI_COMMIT_CLAUDE_API_KEY` | Claude API 키 | - | ✅ (Claude 사용시) |
 | `AI_COMMIT_OPENAI_API_KEY` | OpenAI API 키 | - | ✅ (OpenAI 사용시) |
 | `AI_COMMIT_GEMINI_API_KEY` | Gemini API 키 | - | ✅ (Gemini 사용시) |
-| `AI_COMMIT_GLM_API_KEY` | GLM API 키 | - | ✅ (GLM 사용시) |
 | `AI_COMMIT_DETAIL` | 디테일 레벨 (`low`, `medium`, `high`) | `medium` | ❌ |
 
 ### API 키 우선순위
@@ -115,7 +106,6 @@ AI가 생성한 3개의 커밋 메시지 후보 중 하나를 선택하거나, �
 - **Claude**: `AI_COMMIT_CLAUDE_API_KEY` > `CLAUDE_API_KEY` > `ANTHROPIC_API_KEY`
 - **OpenAI**: `AI_COMMIT_OPENAI_API_KEY` > `OPENAI_API_KEY`
 - **Gemini**: `AI_COMMIT_GEMINI_API_KEY` > `GEMINI_API_KEY` > `GOOGLE_API_KEY`
-- **GLM**: `AI_COMMIT_GLM_API_KEY` > `GLM_API_KEY` > `ZAI_API_KEY`
 - **Codex**: `AI_COMMIT_CODEX_API_KEY` > `CODEX_API_KEY` > `OPENAI_API_KEY`
 
 ## 지원하는 모델 (Code-optimized)
@@ -123,7 +113,6 @@ AI가 생성한 3개의 커밋 메시지 후보 중 하나를 선택하거나, �
 - `claude` - Claude 3.5 Sonnet
 - `openai` - GPT-4o-mini
 - `codex` - Code Davinci 003
-- `glm` - GLM-4 Flash
 - `gemini` - Gemini 2.0 Flash Thinking-Exp
 
 ## Conventional Commit 형식
@@ -196,11 +185,6 @@ export AI_COMMIT_OPENAI_API_KEY="sk-..."
 export AI_COMMIT_MODEL="gemini"
 export AI_COMMIT_GEMINI_API_KEY="..."
 ./git-ai-commit
-
-# GLM
-export AI_COMMIT_MODEL="glm"
-export AI_COMMIT_GLM_API_KEY="..."
-./git-ai-commit
 ```
 
 ### 높은 디테일 레벨
@@ -228,7 +212,6 @@ git-ai-commit/
 │   │   ├── claude.go     # Claude 구현
 │   │   ├── openai.go     # OpenAI 구현
 │   │   ├── codex.go      # Codex 구현
-│   │   ├── glm.go        # GLM 구현
 │   │   ├── gemini.go     # Gemini 구현
 │   │   └── utils.go      # 유틸리티 함수
 │   ├── model/
