@@ -22,8 +22,8 @@ func NewGeminiProvider(apiKey string) (*GeminiProvider, error) {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
-	// gemini-2.0-flash-thinking-exp 모델 사용
-	model := client.GenerativeModel("gemini-2.0-flash-thinking-exp")
+	// gemini-2.0-flash 모델 사용
+	model := client.GenerativeModel("gemini-2.0-flash")
 	model.SetMaxOutputTokens(4096)
 
 	return &GeminiProvider{

@@ -113,7 +113,7 @@ AI가 생성한 3개의 커밋 메시지 후보 중 하나를 선택하거나, �
 - `claude` - Claude 3.5 Sonnet
 - `openai` - GPT-4o-mini
 - `codex` - Code Davinci 003
-- `gemini` - Gemini 2.0 Flash Thinking-Exp
+- `gemini` - Gemini 2.0 Flash
 
 ## Conventional Commit 형식
 
