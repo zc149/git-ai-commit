@@ -6,3 +6,4 @@ func TestFunction() string {
 }
 // Gemini API 테스트용 주석
 // 새로운 API 키로 테스트
+// UI 버그 수정 테스트
