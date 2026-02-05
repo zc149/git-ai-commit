@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"flag"
 	"fmt"
 	"git-ai-commit/internal/config"
 	"git-ai-commit/internal/core"
@@ -13,12 +14,14 @@ import (
 // RootCommand는 메인 명령어입니다.
 type RootCommand struct {
 	config *config.Config
+	detail string
 }
 
 // NewRootCommand는 새로운 RootCommand 인스턴스를 생성합니다.
-func NewRootCommand(cfg *config.Config) *RootCommand {
+func NewRootCommand(cfg *config.Config, detail string) *RootCommand {
 	return &RootCommand{
 		config: cfg,
+		detail: detail,
 	}
 }
 
@@ -80,7 +83,8 @@ func (r *RootCommand) Run() error {
 	}
 
 	// 6. 커밋 메시지 생성
-	detail := getEnvWithDefault("AI_COMMIT_DETAIL", "medium")
+	detail := r.getDetailLevel()
+	fmt.Printf("📝 디테일 레벨: %s\n", detail)
 	fmt.Println("\n🔄 AI가 커밋 메시지를 생성 중...")
 	generator := core.NewGenerator(provider)
 	messages, err := generator.Generate(diffResult, detail)
@@ -111,14 +115,43 @@ func (r *RootCommand) Run() error {
 
 // RunWithArgs는 명령줄 인자를 받아 실행합니다.
 func RunWithArgs(args []string) error {
+	// 플래그 정의
+	detailFlag := flag.String("detail", "", "디테일 레벨: low, medium, high")
+
+	// 플래그 파싱
+	flag.CommandLine.Parse(args)
+
+	// 디테일 레벨 유효성 검사
+	if *detailFlag != "" {
+		valid := false
+		for _, level := range []string{"low", "medium", "high"} {
+			if *detailFlag == level {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("잘못된 디테일 레벨: %s (low, medium, high 중 하나를 입력하세요)", *detailFlag)
+		}
+	}
+
 	// 설정 로드
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("설정 로드 실패: %w", err)
 	}
 
-	cmd := NewRootCommand(cfg)
+	cmd := NewRootCommand(cfg, *detailFlag)
 	return cmd.Run()
+}
+
+// getDetailLevel은 디테일 레벨을 반환합니다.
+// 우선순위: 명령줄 옵션 > 환경 변수 > 기본값
+func (r *RootCommand) getDetailLevel() string {
+	if r.detail != "" {
+		return r.detail
+	}
+	return getEnvWithDefault("AI_COMMIT_DETAIL", "medium")
 }
 
 // getEnvWithDefault는 환경변수를 가져오거나 기본값을 반환합니다.
@@ -129,3 +162,4 @@ func getEnvWithDefault(key, defaultValue string) string {
 	}
 	return value
 }
+// 테스트용 코드
