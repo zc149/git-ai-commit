@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"git-ai-commit/internal/config"
 	"git-ai-commit/internal/core"
 	"git-ai-commit/internal/git"
 	"git-ai-commit/internal/llm"
@@ -9,22 +10,15 @@ import (
 	"os"
 )
 
-// Config는 애플리케이션 설정입니다.
-type Config struct {
-	Model  string
-	APIKey string
-	Detail string
-}
-
 // RootCommand는 메인 명령어입니다.
 type RootCommand struct {
-	config *Config
+	config *config.Config
 }
 
 // NewRootCommand는 새로운 RootCommand 인스턴스를 생성합니다.
-func NewRootCommand(config *Config) *RootCommand {
+func NewRootCommand(cfg *config.Config) *RootCommand {
 	return &RootCommand{
-		config: config,
+		config: cfg,
 	}
 }
 
@@ -61,30 +55,49 @@ func (r *RootCommand) Run() error {
 		fmt.Printf("   추천 scope: %s\n", diffResult.Scopes)
 	}
 
-	// 3. LLM 제공자 생성
-	provider, err := llm.NewProvider(r.config.Model, r.config.APIKey)
+	// 3. 사용할 모델 결정
+	model := r.config.Model
+	if model == "" {
+		model = r.config.GetFirstAvailableModel()
+	}
+
+	if model == "" {
+		return fmt.Errorf("사용 가능한 API 키가 없습니다. .env 파일 또는 환경변수에 API 키를 설정해주세요")
+	}
+
+	fmt.Printf("🤖 사용 모델: %s\n", model)
+
+	// 4. API 키 가져오기
+	apiKey, err := r.config.GetAPIKey(model)
+	if err != nil {
+		return fmt.Errorf("API 키 가져오기 실패: %w", err)
+	}
+
+	// 5. LLM 제공자 생성
+	provider, err := llm.NewProvider(model, apiKey)
 	if err != nil {
 		return fmt.Errorf("LLM 제공자 생성 실패: %w", err)
 	}
 
-	// 4. 커밋 메시지 생성
+	// 6. 커밋 메시지 생성
+	detail := getEnvWithDefault("AI_COMMIT_DETAIL", "medium")
 	fmt.Println("\n🔄 AI가 커밋 메시지를 생성 중...")
 	generator := core.NewGenerator(provider)
-	messages, err := generator.Generate(diffResult, r.config.Detail)
+	messages, err := generator.Generate(diffResult, detail)
 	if err != nil {
 		return fmt.Errorf("커밋 메시지 생성 실패: %w", err)
 	}
 
 	fmt.Println("✅ 커밋 메시지 후보가 생성되었습니다.")
 
-	// 5. 사용자 선택
+	// 7. 사용자 선택
 	selector := ui.NewSelector()
 	selectedMessage, err := selector.Select(messages)
 	if err != nil {
 		return err
 	}
 
-	// 6. 커밋 실행
+	// 8. 커밋 실행
 	fmt.Printf("\n🎯 커밋 메시지: %s\n", selectedMessage)
 	fmt.Println("\n🚀 커밋을 실행합니다...")
 
@@ -98,18 +111,13 @@ func (r *RootCommand) Run() error {
 
 // RunWithArgs는 명령줄 인자를 받아 실행합니다.
 func RunWithArgs(args []string) error {
-	config := &Config{
-		Model:  getEnvWithDefault("AI_COMMIT_MODEL", "claude"),
-		APIKey: getEnvWithDefault("AI_COMMIT_API_KEY", ""),
-		Detail: getEnvWithDefault("AI_COMMIT_DETAIL", "medium"),
+	// 설정 로드
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("설정 로드 실패: %w", err)
 	}
 
-	// API 키 확인
-	if config.APIKey == "" {
-		return fmt.Errorf("AI_COMMIT_API_KEY 환경변수가 설정되지 않았습니다")
-	}
-
-	cmd := NewRootCommand(config)
+	cmd := NewRootCommand(cfg)
 	return cmd.Run()
 }
 

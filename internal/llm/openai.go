@@ -1,104 +1,55 @@
 package llm
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
-	"net/http"
+
+	"github.com/sashabaranov/go-openai"
 )
 
 // OpenAIProvider는 OpenAI API를 사용하는 제공자입니다.
 type OpenAIProvider struct {
-	apiKey  string
-	baseURL string
+	client *openai.Client
+	model  string
 }
 
 // NewOpenAIProvider는 새로운 OpenAIProvider 인스턴스를 생성합니다.
 func NewOpenAIProvider(apiKey string) *OpenAIProvider {
+	config := openai.DefaultConfig(apiKey)
+	// 필요한 경우 OpenAI API URL 커스터마이즈 가능
+	// config.BaseURL = "https://api.openai.com/v1"
+
 	return &OpenAIProvider{
-		apiKey:  apiKey,
-		baseURL: "https://api.openai.com/v1/chat/completions",
+		client: openai.NewClientWithConfig(config),
+		model:  "gpt-4o-mini",
 	}
-}
-
-// openaiRequest는 OpenAI API 요청 구조체입니다.
-type openaiRequest struct {
-	Model     string          `json:"model"`
-	Messages  []openaiMessage `json:"messages"`
-	MaxTokens int             `json:"max_tokens"`
-}
-
-// openaiMessage는 OpenAI API 메시지 구조체입니다.
-type openaiMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-// openaiResponse는 OpenAI API 응답 구조체입니다.
-type openaiResponse struct {
-	Choices []openaiChoice `json:"choices"`
-}
-
-// openaiChoice는 OpenAI API 응답 선택 구조체입니다.
-type openaiChoice struct {
-	Message openaiMessage `json:"message"`
 }
 
 // Generate는 OpenAI API를 호출하여 커밋 메시지 후보들을 생성합니다.
 func (o *OpenAIProvider) Generate(prompt string) ([]string, error) {
-	reqBody := openaiRequest{
-		Model: "gpt-4",
-		Messages: []openaiMessage{
+	ctx := context.Background()
+
+	resp, err := o.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model: o.model,
+		Messages: []openai.ChatCompletionMessage{
 			{
-				Role:    "user",
+				Role:    openai.ChatMessageRoleUser,
 				Content: prompt,
 			},
 		},
-		MaxTokens: 1000,
-	}
+		MaxTokens: 4096,
+	})
 
-	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, fmt.Errorf("failed to create chat completion: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", o.baseURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+o.apiKey)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	var openaiResp openaiResponse
-	if err := json.Unmarshal(body, &openaiResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	if len(openaiResp.Choices) == 0 {
+	if len(resp.Choices) == 0 {
 		return nil, fmt.Errorf("no choices in response")
 	}
 
 	// 응답 텍스트에서 메시지 후보 추출
-	text := openaiResp.Choices[0].Message.Content
+	text := resp.Choices[0].Message.Content
 	messages := parseCommitMessages(text)
 
 	if len(messages) == 0 {

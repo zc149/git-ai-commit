@@ -38,10 +38,47 @@ sudo mv git-ai-commit /usr/local/bin/
 
 ### 1. 환경변수 설정
 
+#### Claude 사용
+
 ```bash
-export AI_COMMIT_API_KEY="your-api-key-here"
-export AI_COMMIT_MODEL="claude"  # 기본값: claude
+export AI_COMMIT_CLAUDE_API_KEY="your-claude-api-key"
+export AI_COMMIT_MODEL="claude"
+```
+
+#### OpenAI 사용
+
+```bash
+export AI_COMMIT_OPENAI_API_KEY="your-openai-api-key"
+export AI_COMMIT_MODEL="openai"
+```
+
+#### Gemini 사용
+
+```bash
+export AI_COMMIT_GEMINI_API_KEY="your-gemini-api-key"
+export AI_COMMIT_MODEL="gemini"
+```
+
+#### GLM 사용
+
+```bash
+export AI_COMMIT_GLM_API_KEY="your-glm-api-key"
+export AI_COMMIT_MODEL="glm"
+```
+
+### 선택 사항
+
+```bash
 export AI_COMMIT_DETAIL="medium"  # low, medium, high (기본값: medium)
+```
+
+### 영구 설정 (선택 사항)
+
+```bash
+# ~/.zshrc 또는 ~/.bashrc에 추가
+echo 'export AI_COMMIT_MODEL="gemini"' >> ~/.zshrc
+echo 'export AI_COMMIT_GEMINI_API_KEY="your-api-key"' >> ~/.zshrc
+source ~/.zshrc
 ```
 
 ### 2. Git 파일 Stage
@@ -64,17 +101,30 @@ AI가 생성한 3개의 커밋 메시지 후보 중 하나를 선택하거나, �
 
 | 변수 | 설명 | 기본값 | 필수 |
 |------|------|--------|------|
-| `AI_COMMIT_API_KEY` | LLM API 키 | - | ✅ |
-| `AI_COMMIT_MODEL` | 사용할 LLM 모델 | `claude` | ❌ |
+| `AI_COMMIT_MODEL` | 사용할 LLM 모델 (`claude`, `openai`, `gemini`, `glm`, `codex`) | 첫 번째 유효한 키 | ❌ |
+| `AI_COMMIT_CLAUDE_API_KEY` | Claude API 키 | - | ✅ (Claude 사용시) |
+| `AI_COMMIT_OPENAI_API_KEY` | OpenAI API 키 | - | ✅ (OpenAI 사용시) |
+| `AI_COMMIT_GEMINI_API_KEY` | Gemini API 키 | - | ✅ (Gemini 사용시) |
+| `AI_COMMIT_GLM_API_KEY` | GLM API 키 | - | ✅ (GLM 사용시) |
 | `AI_COMMIT_DETAIL` | 디테일 레벨 (`low`, `medium`, `high`) | `medium` | ❌ |
 
-## 지원하는 모델
+### API 키 우선순위
+
+각 제공자별로 여러 환경 변수 이름을 지원합니다:
+
+- **Claude**: `AI_COMMIT_CLAUDE_API_KEY` > `CLAUDE_API_KEY` > `ANTHROPIC_API_KEY`
+- **OpenAI**: `AI_COMMIT_OPENAI_API_KEY` > `OPENAI_API_KEY`
+- **Gemini**: `AI_COMMIT_GEMINI_API_KEY` > `GEMINI_API_KEY` > `GOOGLE_API_KEY`
+- **GLM**: `AI_COMMIT_GLM_API_KEY` > `GLM_API_KEY` > `ZAI_API_KEY`
+- **Codex**: `AI_COMMIT_CODEX_API_KEY` > `CODEX_API_KEY` > `OPENAI_API_KEY`
+
+## 지원하는 모델 (Code-optimized)
 
 - `claude` - Claude 3.5 Sonnet
-- `openai` - GPT-4
+- `openai` - GPT-4o-mini
 - `codex` - Code Davinci 003
-- `glm` - GLM-4
-- `gemini` - Gemini Pro
+- `glm` - GLM-4 Flash
+- `gemini` - Gemini 2.0 Flash Thinking-Exp
 
 ## Conventional Commit 형식
 
@@ -137,8 +187,19 @@ q) 종료
 ### 다른 모델 사용
 
 ```bash
+# OpenAI
 export AI_COMMIT_MODEL="openai"
-export AI_COMMIT_API_KEY="sk-..."
+export AI_COMMIT_OPENAI_API_KEY="sk-..."
+./git-ai-commit
+
+# Gemini
+export AI_COMMIT_MODEL="gemini"
+export AI_COMMIT_GEMINI_API_KEY="..."
+./git-ai-commit
+
+# GLM
+export AI_COMMIT_MODEL="glm"
+export AI_COMMIT_GLM_API_KEY="..."
 ./git-ai-commit
 ```
 

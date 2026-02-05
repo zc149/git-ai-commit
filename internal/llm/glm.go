@@ -18,7 +18,7 @@ type GLMProvider struct {
 func NewGLMProvider(apiKey string) *GLMProvider {
 	return &GLMProvider{
 		apiKey:  apiKey,
-		baseURL: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+		baseURL: "https://api.z.ai/api/paas/v4/chat/completions",
 	}
 }
 
@@ -48,14 +48,14 @@ type glmChoice struct {
 // Generate는 GLM API를 호출하여 커밋 메시지 후보들을 생성합니다.
 func (g *GLMProvider) Generate(prompt string) ([]string, error) {
 	reqBody := glmRequest{
-		Model: "glm-4",
+		Model: "glm-4-flash",
 		Messages: []glmMessage{
 			{
 				Role:    "user",
 				Content: prompt,
 			},
 		},
-		MaxTokens: 1000,
+		MaxTokens: 4096,
 	}
 
 	jsonData, err := json.Marshal(reqBody)

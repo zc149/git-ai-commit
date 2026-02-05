@@ -18,7 +18,7 @@ func NewProvider(model string, apiKey string) (Provider, error) {
 	case "glm":
 		return NewGLMProvider(apiKey), nil
 	case "gemini":
-		return NewGeminiProvider(apiKey), nil
+		return NewGeminiProvider(apiKey)
 	default:
 		return NewClaudeProvider(apiKey), nil
 	}
