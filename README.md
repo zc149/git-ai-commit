@@ -12,241 +12,135 @@ AI를 활용하여 Git 커밋 메시지를 자동으로 생성하는 CLI 도구�
 - 🎨 사용자 친화적인 TUI 인터페이스
 - 🌍 다국어 지원 (한국어, 영어)
 
-## 지원하는 LLM
-
-- **Groq** - Llama 3.3-70B-Versatile (완전 무료, 매우 빠름)
-
 ## 설치
 
-### 빌드
+### macOS
+
+#### Homebrew로 설치 (추천)
 
 ```bash
-go build -o git-ai-commit
+brew install zc149/git-ai-commit/git-ai-commit
 ```
 
-### 사용 가능한 바이너리 (선택 사항)
+#### GitHub Releases에서 설치
+
+1. [GitHub Releases](https://github.com/zc149/git-ai-commit/releases) 페이지로 이동
+2. 다운로드:
+   - **Intel Mac**: `git-ai-commit-darwin-amd64`
+   - **Apple Silicon (M1/M2/M3)**: `git-ai-commit-darwin-arm64`
+3. 터미널에서 다운로드한 파일 실행 권한 부여:
 
 ```bash
-# 바이너리를 PATH에 추가
-sudo mv git-ai-commit /usr/local/bin/
+chmod +x ~/Downloads/git-ai-commit-darwin-arm64
+```
+
+4. `/usr/local/bin`으로 이동 (시스템 PATH에 추가):
+
+```bash
+sudo mv ~/Downloads/git-ai-commit-darwin-arm64 /usr/local/bin/git-ai-commit
+```
+
+### Windows
+
+1. [GitHub Releases](https://github.com/zc149/git-ai-commit/releases) 페이지로 이동
+2. `git-ai-commit-windows-amd64.exe` 다운로드
+3. 폴더 생성 및 파일 이동:
+
+```cmd
+mkdir C:\git-ai-commit
+move Downloads\git-ai-commit-windows-amd64.exe C:\git-ai-commit\git-ai-commit.exe
+```
+
+4. PATH 환경변수에 `C:\git-ai-commit` 추가:
+   - Windows 키 + "시스템 환경 변수 편집" 검색
+   - "환경 변수" 클릭
+   - "사용자 변수"의 "Path" 선택 후 "편집" 클릭
+   - "새로 만들기" 클릭 후 `C:\git-ai-commit` 입력
+   - 확인 클릭
+
+### Linux
+
+```bash
+# 다운로드
+wget https://github.com/zc149/git-ai-commit/releases/latest/download/git-ai-commit-linux-amd64
+
+# 실행 권한 부여
+chmod +x git-ai-commit-linux-amd64
+
+# /usr/local/bin으로 이동
+sudo mv git-ai-commit-linux-amd64 /usr/local/bin/git-ai-commit
+```
+
+## 설치 확인
+
+설치가 완료되면 다음 명령어로 확인:
+
+```bash
+git ai-commit --help
+```
+
+## API 키 설정
+
+### Groq API 키 발급
+
+1. [console.groq.com](https://console.groq.com)에서 계정 생성
+2. API Keys 메뉴에서 새 키 생성
+
+### 환경변수 설정
+
+#### macOS / Linux
+
+```bash
+# 현재 터미널 세션에만 적용
+export AI_COMMIT_GROQ_API_KEY="your-groq-api-key"
+
+# 영구 적용 (~/.zshrc 또는 ~/.bashrc에 추가)
+echo 'export AI_COMMIT_GROQ_API_KEY="your-groq-api-key"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+#### Windows (PowerShell)
+
+```powershell
+# 현재 세션에만 적용
+$env:AI_COMMIT_GROQ_API_KEY="your-groq-api-key"
+
+# 영구 적용
+[System.Environment]::SetEnvironmentVariable('AI_COMMIT_GROQ_API_KEY', 'your-groq-api-key', 'User')
+```
+
+#### Windows (CMD)
+
+```cmd
+# 영구 적용
+setx AI_COMMIT_GROQ_API_KEY "your-groq-api-key"
 ```
 
 ## 사용법
 
-### 1. 환경변수 설정
-
-```bash
-export AI_COMMIT_GROQ_API_KEY="your-groq-api-key"
-```
-
-**Groq API 키 받는 방법:**
-1. [console.groq.com](https://console.groq.com)에서 계정 생성
-2. API Keys 메뉴에서 새 키 생성
-3. 키를 환경변수에 설정
-
-### 선택 사항
-
-```bash
-export AI_COMMIT_MODEL="groq"  # 기본값 (현재 유일한 옵션)
-export AI_COMMIT_DETAIL="medium"  # low, medium, high (기본값: medium)
-export AI_COMMIT_LANG="en"  # en, ko (기본값: en)
-```
-
-### 영구 설정 (선택 사항)
-
-```bash
-# ~/.zshrc 또는 ~/.bashrc에 추가
-echo 'export AI_COMMIT_GROQ_API_KEY="your-api-key"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-### 2. Git 파일 Stage
+### 1. Git 파일 Stage
 
 ```bash
 git add .
 ```
 
-### 3. 실행
+### 2. AI 커밋 메시지 생성
 
 ```bash
-./git-ai-commit
+git ai-commit
 ```
 
-### 언어 설정
-
-사용 언어를 설정할 수 있습니다 (기본값: 영어):
-
-#### 명령줄 옵션으로 설정 (우선순위 1)
-
-```bash
-# 영어 (기본)
-./git-ai-commit --lang en
-
-# 한국어
-./git-ai-commit --lang ko
-```
-
-#### 환경변수로 설정 (우선순위 2)
-
-```bash
-export AI_COMMIT_LANG="ko"
-./git-ai-commit
-```
-
-**우선순위:** 명령줄 옵션 > 환경 변수 > 기본값(`en`)
-
-### 디테일 레벨 설정
-
-커밋 메시지의 상세도를 조절할 수 있습니다:
-
-#### 명령줄 옵션으로 설정 (우선순위 1)
-
-```bash
-# 간단한 메시지
-./git-ai-commit --detail low
-
-# 중간 길이 (기본)
-./git-ai-commit --detail medium
-./git-ai-commit
-
-# 상세한 메시지
-./git-ai-commit --detail high
-```
-
-#### 환경변수로 설정 (우선순위 2)
-
-```bash
-export AI_COMMIT_DETAIL="high"
-./git-ai-commit
-```
-
-**우선순위:** 명령줄 옵션 > 환경 변수 > 기본값(`medium`)
-
-#### 디테일 레벨 설명
-
-- **low**: 간단하고 짧은 커밋 메시지 (한 줄 위주)
-- **medium**: 적절한 길이의 커밋 메시지 (기본값)
-- **high**: 상세하고 긴 커밋 메시지 (변경 내용을 상세히 설명)
-
-### 4. 메시지 선택
+### 3. 메시지 후보 중 선택
 
 AI가 생성한 3개의 커밋 메시지 후보 중 하나를 선택하거나, 직접 입력할 수 있습니다.
 
-## 환경변수
-
-| 변수 | 설명 | 기본값 | 필수 |
-|------|------|--------|------|
-| `AI_COMMIT_GROQ_API_KEY` | Groq API 키 | - | ✅ |
-| `AI_COMMIT_MODEL` | 사용할 LLM 모델 (현재는 groq만 지원) | `groq` | ❌ |
-| `AI_COMMIT_DETAIL` | 디테일 레벨 (`low`, `medium`, `high`) | `medium` | ❌ |
-| `AI_COMMIT_LANG` | 언어 설정 (`en`, `ko`) | `en` | ❌ |
-
-### API 키 우선순위
-
-Groq는 다음 환경 변수 중 첫 번째로 설정된 값을 사용합니다:
-- `AI_COMMIT_GROQ_API_KEY` > `GROQ_API_KEY`
-
-## 지원하는 모델
-
-- `groq` - Llama 3.3-70B-Versatile
-  - 완전 무료
-  - 매우 빠른 추론 속도
-  - 높은 성능
-
-## Conventional Commit 형식
-
-이 도구는 [Conventional Commits](https://www.conventionalcommits.org/) 형식을 따릅니다:
-
-```
-type(scope): description
-```
-
-### 타입 (Type)
-
-- `feat`: 새로운 기능
-- `fix`: 버그 수정
-- `docs`: 문서 변경
-- `style`: 코드 스타일 변경 (포맷팅 등)
-- `refactor`: 코드 리팩토링
-- `test`: 테스트 관련
-- `build`: 빌드 시스템 또는 의존성 변경
-- `chore`: 그 외 작업
-
-## 예시
-
-### 기본 사용
+### 예시
 
 ```bash
-# 1. 파일 변경 후 stage
-git add main.go
+git ai-commit
 
-# 2. git-ai-commit 실행
-./git-ai-commit
-
-# 3. 메시지 후보 중 선택
 🤖 Git AI Commit
 ================
-
-✅ 1개의 파일이 staged되었습니다:
-  - main.go
-
-📊 추천 커밋 타입: refactor
-🤖 사용 모델: groq
-📝 디테일 레벨: medium
-
-🔄 AI가 커밋 메시지를 생성 중...
-✅ 커밋 메시지 후보가 생성되었습니다.
-
-=== 커밋 메시지 후보 ===
-1) refactor(core): 메시지 생성 로직 개선
-2) refactor(generator): diff 분석 최적화
-3) refactor: 커밋 메시지 생성 프로세스 리팩토링
-c) 사용자 직접 입력
-q) 종료
-
-선택 (1-3 또는 c/q): 1
-
-🎯 커밋 메시지: refactor(core): 메시지 생성 로직 개선
-
-🚀 커밋을 실행합니다...
-
-✨ 커밋 완료!
-```
-
-### 다양한 언어 사용
-
-```bash
-# 영어 메시지 생성 (기본)
-./git-ai-commit --lang en
-
-# 한국어 메시지 생성
-./git-ai-commit --lang ko
-
-# 환경변수로 설정
-export AI_COMMIT_LANG="ko"
-./git-ai-commit
-```
-
-### 다양한 디테일 레벨 사용
-
-```bash
-# 간단한 메시지
-./git-ai-commit --detail low
-
-# 상세한 메시지
-./git-ai-commit --detail high
-
-# 환경변수로 설정
-export AI_COMMIT_DETAIL="high"
-./git-ai-commit
-```
-
-### 영어 모드 예시
-
-```bash
-./git-ai-commit --lang en
-
-🤖 Git AI Commit
 
 ✅ 1 file staged
   - main.go
@@ -274,6 +168,133 @@ Select (1-3 or c/q): 1
 ✨ Commit complete!
 ```
 
+## 옵션
+
+### 언어 설정
+
+기본값은 영어입니다. 한국어로 사용하려면:
+
+```bash
+# 명령줄 옵션으로 설정
+git ai-commit --lang ko
+
+# 영어 (기본)
+git ai-commit --lang en
+```
+
+### 디테일 레벨
+
+커밋 메시지의 상세도를 조절할 수 있습니다:
+
+```bash
+# 간단한 메시지
+git ai-commit --detail low
+
+# 중간 길이 (기본)
+git ai-commit --detail medium
+
+# 상세한 메시지
+git ai-commit --detail high
+```
+
+#### 디테일 레벨 설명
+
+- **low**: 간단하고 짧은 커밋 메시지 (한 줄 위주)
+- **medium**: 적절한 길이의 커밋 메시지 (기본값)
+- **high**: 정형화된 상세 커밋 메시지
+  - 첫 줄: Conventional Commit 형식 (type: message)
+  - 두 번째 줄: 빈 줄
+  - 세 번째 줄부터: `- `로 시작하는 상세 내용 목록
+  
+  예시:
+  ```
+  feat(auth): implement OAuth2 authentication
+
+  - Add Google OAuth provider
+  - Add GitHub OAuth provider
+  - Update authentication flow
+  - Add token refresh mechanism
+  ```
+
+### 사용 예시
+
+#### 상세한 메시지 (한국어)
+
+```bash
+git ai-commit --lang ko --detail high
+```
+
+#### 간단한 메시지 (영어)
+
+```bash
+git ai-commit --lang en --detail low
+```
+
+## 환경변수
+
+| 변수 | 설명 | 기본값 | 필수 |
+|------|------|--------|------|
+| `AI_COMMIT_GROQ_API_KEY` | Groq API 키 | - | ✅ |
+| `AI_COMMIT_MODEL` | 사용할 LLM 모델 (현재는 groq만 지원) | `groq` | ❌ |
+| `AI_COMMIT_DETAIL` | 디테일 레벨 (`low`, `medium`, `high`) | `medium` | ❌ |
+| `AI_COMMIT_LANG` | 언어 설정 (`en`, `ko`) | `en` | ❌ |
+
+### 환경변수로 설정
+
+#### macOS / Linux
+
+```bash
+# ~/.zshrc 또는 ~/.bashrc에 추가
+export AI_COMMIT_DETAIL="high"
+export AI_COMMIT_LANG="ko"
+```
+
+#### Windows (PowerShell)
+
+```powershell
+[System.Environment]::SetEnvironmentVariable('AI_COMMIT_DETAIL', 'high', 'User')
+[System.Environment]::SetEnvironmentVariable('AI_COMMIT_LANG', 'ko', 'User')
+```
+
+#### Windows (CMD)
+
+```cmd
+setx AI_COMMIT_DETAIL "high"
+setx AI_COMMIT_LANG "ko"
+```
+
+### 우선순위
+
+1. 명령줄 옵션 (`--detail`, `--lang`)
+2. 환경변수 (`AI_COMMIT_DETAIL`, `AI_COMMIT_LANG`)
+3. 기본값 (`medium`, `en`)
+
+## Conventional Commit 형식
+
+이 도구는 [Conventional Commits](https://www.conventionalcommits.org/) 형식을 따릅니다:
+
+```
+type(scope): description
+```
+
+### 타입 (Type)
+
+- `feat`: 새로운 기능
+- `fix`: 버그 수정
+- `docs`: 문서 변경
+- `style`: 코드 스타일 변경 (포맷팅 등)
+- `refactor`: 코드 리팩토링
+- `test`: 테스트 관련
+- `build`: 빌드 시스템 또는 의존성 변경
+- `chore`: 그 외 작업
+
+## 지원하는 모델
+
+- **Groq** - Llama 3.3-70B-Versatile
+  - 완전 무료
+  - 매우 빠른 추론 속도
+  - 높은 성능
+
 ## 프로젝트 구조
 
 ```
@@ -300,7 +321,20 @@ git-ai-commit/
 ├── docs/
 │   └── claude/           # 프로젝트 문서
 ├── main.go               # 진입점
+├── build.sh              # 빌드 스크립트
 └── README.md
+```
+
+## 개발
+
+### 빌드
+
+```bash
+# 현재 플랫폼용 빌드
+go build -o git-ai-commit
+
+# 모든 플랫폼용 빌드
+./build.sh
 ```
 
 ## 기여

@@ -97,21 +97,37 @@ func GeneratePrompt(diff *git.DiffResult, detail string, lang string) string {
 		if lang == "ko" {
 			builder.WriteString("- 변경 내용을 자세히 설명\n")
 			builder.WriteString("- 영향받는 기능 명시\n")
+			builder.WriteString("- 정형화된 형식 사용:\n")
+			builder.WriteString("  feat(scope): 제목 줄\n")
+			builder.WriteString("  \n")
+			builder.WriteString("  - 상세 내용 1\n")
+			builder.WriteString("  - 상세 내용 2\n")
+			builder.WriteString("  - 상세 내용 3\n")
 		} else {
 			builder.WriteString("- Describe changes in detail\n")
 			builder.WriteString("- Mention affected features\n")
+			builder.WriteString("- Use structured format:\n")
+			builder.WriteString("  feat(scope): title line\n")
+			builder.WriteString("  \n")
+			builder.WriteString("  - detail 1\n")
+			builder.WriteString("  - detail 2\n")
+			builder.WriteString("  - detail 3\n")
 		}
 	case "medium":
 		if lang == "ko" {
 			builder.WriteString("- 적절한 디테일 수준 유지\n")
+			builder.WriteString("- 한 줄 또는 간단한 다중 줄 형식\n")
 		} else {
 			builder.WriteString("- Maintain appropriate detail level\n")
+			builder.WriteString("- Single line or simple multi-line format\n")
 		}
 	case "low":
 		if lang == "ko" {
 			builder.WriteString("- 최소한의 설명\n")
+			builder.WriteString("- 한 줄 형식 권장\n")
 		} else {
 			builder.WriteString("- Minimal description\n")
+			builder.WriteString("- Single line format recommended\n")
 		}
 	}
 
@@ -161,4 +177,5 @@ func summarizeChanges(changes string) string {
 
 	return summary
 }
+
 // Add language support
