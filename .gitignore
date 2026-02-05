@@ -1,0 +1,29 @@
+# 빌드된 바이너리
+git-ai-commit
+git-ai-commit-*
+
+# 환경 변수
+.env
+
+# Go 빌드 관련
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
