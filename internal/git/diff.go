@@ -211,76 +211,212 @@ func InferCommitType(files []FileChange) string {
 		return "chore"
 	}
 
-	hasTest := false
-	hasDoc := false
-	hasConfig := false
-	hasNewFile := false
-	hasDeletedFile := false
+	// 파일 유형별 가중치 점수
+	typeScore := make(map[string]int)
+	typeScore["feat"] = 0
+	typeScore["fix"] = 0
+	typeScore["build"] = 0
+	typeScore["docs"] = 0
+	typeScore["test"] = 0
+	typeScore["refactor"] = 0
+	typeScore["chore"] = 0
+
+	sourceFileCount := 0
+	newSourceFileCount := 0
+	newDirectories := make(map[string]bool)
+
+	hasDependencyFile := false
+	hasRegularConfig := false
 
 	for _, file := range files {
+		path := file.Path
+		parts := strings.Split(filepath.Clean(path), string(filepath.Separator))
+
+		// 새 디렉토리 감지
+		if len(parts) >= 2 && file.IsNew {
+			dir := strings.Join(parts[:len(parts)-1], string(filepath.Separator))
+			newDirectories[dir] = true
+		}
+
 		switch file.FileType {
+		case FileTypeSource:
+			sourceFileCount++
+			if file.IsNew {
+				newSourceFileCount++
+				// 새 소스 파일 추가는 feat에 강력한 점수
+				typeScore["feat"] += 10
+			} else {
+				// 기존 소스 파일 수정
+				typeScore["refactor"] += 3
+				typeScore["fix"] += 1
+			}
+
 		case FileTypeTest:
-			hasTest = true
+			if file.IsNew {
+				typeScore["test"] += 8
+			} else {
+				typeScore["test"] += 3
+			}
+
 		case FileTypeDoc:
-			hasDoc = true
+			typeScore["docs"] += 8
+
 		case FileTypeConfig:
-			hasConfig = true
-		}
-
-		if file.IsNew {
-			hasNewFile = true
-		}
-		if file.IsDeleted {
-			hasDeletedFile = true
-		}
-	}
-
-	// 우선순위 규칙에 따른 타입 결정
-	if hasTest && !hasDoc && !hasConfig {
-		return "test"
-	}
-
-	if hasDoc && !hasTest && !hasConfig {
-		return "docs"
-	}
-
-	if hasConfig && !hasDoc && !hasTest {
-		return "build"
-	}
-
-	// 의존성 변경 확인
-	for _, file := range files {
-		if file.FileType == FileTypeConfig &&
-			(strings.Contains(file.Path, "package.json") ||
-				strings.Contains(file.Path, "go.mod") ||
-				strings.Contains(file.Path, "Cargo.toml") ||
-				strings.Contains(file.Path, "pom.xml")) {
-			// 변경 내용에서 버전 변경 감지
-			if strings.Contains(file.Changes, "+") &&
-				(strings.Contains(file.Changes, "version") ||
-					strings.Contains(file.Changes, "\"")) {
-				return "build"
+			if isDependencyFile(path) {
+				hasDependencyFile = true
+				// 의존성 변경 = build
+				typeScore["build"] += 5
+			} else {
+				hasRegularConfig = true
+				// 일반 설정 = chore
+				typeScore["chore"] += 3
 			}
 		}
 	}
 
-	// 새 파일만 추가된 경우
-	if hasNewFile && !hasDeletedFile {
-		return "feat"
+	// 새 디렉토리가 2개 이상 = 새 기능 추가
+	if len(newDirectories) >= 2 {
+		typeScore["feat"] += 20
 	}
 
-	// 변경 내용에서 버그 관련 키워드 검사
-	bugKeywords := []string{"fix", "bug", "error", "issue", "resolve"}
-	for _, file := range files {
-		for _, keyword := range bugKeywords {
-			if strings.Contains(strings.ToLower(file.Changes), keyword) {
-				return "fix"
-			}
+	// 새 소스 파일이 3개 이상 = 새 기능
+	if newSourceFileCount >= 3 {
+		typeScore["feat"] += 15
+	}
+
+	// 의존성 파일만 변경됨 = build
+	if hasDependencyFile && sourceFileCount == 0 && !hasRegularConfig {
+		typeScore["build"] += 10
+		typeScore["chore"] -= 5
+	}
+
+	// 일반 설정 파일만 변경됨 = chore
+	if hasRegularConfig && sourceFileCount == 0 && !hasDependencyFile {
+		typeScore["chore"] += 10
+		typeScore["build"] -= 5
+	}
+
+	// 최대 점수 타입 선택
+	maxScore := 0
+	var bestType string
+	for commitType, score := range typeScore {
+		if score > maxScore {
+			maxScore = score
+			bestType = commitType
 		}
 	}
 
-	// 기본값
-	return "refactor"
+	if bestType == "" {
+		return "chore"
+	}
+	return bestType
+}
+
+// isDependencyFile은 파일이 의존성 관련 파일인지 확인합니다.
+func isDependencyFile(path string) bool {
+	base := filepath.Base(path)
+
+	// Node.js/JavaScript
+	if base == "package.json" || base == "package-lock.json" || base == "yarn.lock" || base == "pnpm-lock.yaml" {
+		return true
+	}
+
+	// Go
+	if base == "go.mod" || base == "go.sum" {
+		return true
+	}
+
+	// Python
+	if base == "requirements.txt" || base == "Pipfile" || base == "poetry.lock" || base == "pyproject.toml" {
+		return true
+	}
+
+	// Java/Maven/Gradle
+	if base == "pom.xml" || base == "build.gradle" || base == "build.gradle.kts" || base == "gradle.properties" {
+		return true
+	}
+
+	// Ruby
+	if base == "Gemfile" || base == "Gemfile.lock" {
+		return true
+	}
+
+	// PHP
+	if base == "composer.json" || base == "composer.lock" {
+		return true
+	}
+
+	// Rust
+	if base == "Cargo.toml" || base == "Cargo.lock" {
+		return true
+	}
+
+	// .NET
+	if strings.HasSuffix(base, ".csproj") || base == "packages.config" {
+		return true
+	}
+
+	// Swift/CocoaPods
+	if base == "Podfile" || base == "Podfile.lock" || base == "Package.swift" {
+		return true
+	}
+
+	// Dart/Flutter
+	if base == "pubspec.yaml" || base == "pubspec.lock" {
+		return true
+	}
+
+	// Composer (PHP)
+	if base == "composer.json" || base == "composer.lock" {
+		return true
+	}
+
+	// CMake
+	if base == "CMakeLists.txt" || base == "CMakeCache.txt" {
+		return true
+	}
+
+	// Conan
+	if base == "conanfile.txt" || base == "conanfile.py" {
+		return true
+	}
+
+	// Vcpkg
+	if base == "vcpkg.json" {
+		return true
+	}
+
+	// Bazel
+	if base == "WORKSPACE" || base == "BUILD" || base == "BUILD.bazel" {
+		return true
+	}
+
+	// Buck
+	if base == "BUCK" {
+		return true
+	}
+
+	// Leiningen (Clojure)
+	if base == "project.clj" {
+		return true
+	}
+
+	// Mix (Elixir)
+	if base == "mix.exs" {
+		return true
+	}
+
+	// Rebar3 (Erlang)
+	if base == "rebar.config" {
+		return true
+	}
+
+	// NuGet.config
+	if base == "NuGet.config" || base == "nuget.config" {
+		return true
+	}
+
+	return false
 }
 
 // InferScopes는 파일 경로에서 scope를 추론합니다.
@@ -289,62 +425,164 @@ func InferScopes(files []FileChange) []string {
 		return []string{}
 	}
 
-	scopes := make(map[string]bool)
-	primaryScope := ""
+	// 1. 디렉토리별 파일 수 집계
+	dirCounts := make(map[string]int)
+	sourceDirs := make(map[string]bool) // 소스 파일이 있는 디렉토리
+	configDirs := make(map[string]bool) // 설정 파일만 있는 디렉토리
 
 	for _, file := range files {
-		// 경로 파싱
-		parts := strings.Split(filepath.Clean(file.Path), string(filepath.Separator))
+		path := file.Path
+		parts := strings.Split(filepath.Clean(path), string(filepath.Separator))
 
-		// 첫 번째 디렉토리를 scope로 사용
-		if len(parts) > 0 && parts[0] != "" {
-			// 일반적인 패키지 구조의 경우
-			if len(parts) > 1 && (parts[0] == "src" || parts[0] == "lib" || parts[0] == "app") {
-				if len(parts) > 2 {
-					scope := parts[1]
-					scopes[scope] = true
-					if primaryScope == "" {
-						primaryScope = scope
-					}
-				}
-			} else {
-				// 그 외 경우 첫 번째 디렉토리 사용
-				scope := parts[0]
-				// 내부 패키지 폴더가 아니라면 추가
-				if !strings.HasPrefix(scope, ".") &&
-					scope != "internal" &&
-					scope != "vendor" &&
-					scope != "node_modules" {
-					scopes[scope] = true
-					if primaryScope == "" {
-						primaryScope = scope
-					}
+		// 각 레벨의 디렉토리 집계
+		for i := 1; i < len(parts); i++ {
+			dir := strings.Join(parts[:i], string(filepath.Separator))
+			dirCounts[dir]++
+		}
+
+		// 파일 유형별 분류
+		if file.FileType == FileTypeSource {
+			// 소스 파일의 모든 상위 디렉토리 표시
+			for i := 1; i < len(parts); i++ {
+				dir := strings.Join(parts[:i], string(filepath.Separator))
+				sourceDirs[dir] = true
+			}
+		} else if file.FileType == FileTypeConfig {
+			// 설정 파일만 있는 디렉토리 확인
+			for i := 1; i < len(parts); i++ {
+				dir := strings.Join(parts[:i], string(filepath.Separator))
+				if !sourceDirs[dir] {
+					configDirs[dir] = true
 				}
 			}
 		}
 	}
 
-	// scope가 없으면 빈 슬라이스 반환
-	if len(scopes) == 0 {
-		return []string{}
+	// 2. 최대 공통 디렉토리 찾기
+	commonPrefix := findCommonPrefix(files)
+
+	// 3. 주요 scope 결정
+	var scopes []string
+
+	if commonPrefix != "" {
+		// 공통 접두사가 있으면 그걸 메인 scope로
+		scopes = append(scopes, simplifyScopeName(commonPrefix))
+	} else {
+		// 공통 접두사가 없으면 소스 파일이 있는 디렉토리 중에서
+		// 가장 파일이 많은 것 선택
+		maxCount := 0
+		var primaryDir string
+		for dir, count := range dirCounts {
+			if sourceDirs[dir] && count > maxCount {
+				maxCount = count
+				primaryDir = dir
+			}
+		}
+		if primaryDir != "" {
+			scopes = append(scopes, simplifyScopeName(primaryDir))
+		}
 	}
 
-	// 결과 리스트 생성 (정렬)
-	result := make([]string, 0, len(scopes))
-	for scope := range scopes {
-		result = append(result, scope)
-	}
-
-	// 주요 scope를 맨 앞으로
-	if len(result) > 1 && primaryScope != "" {
-		for i, scope := range result {
-			if scope == primaryScope {
-				// swap
-				result[0], result[i] = result[i], result[0]
-				break
+	// 4. 2번째 scope (필요한 경우)
+	// 메인 scope의 바로 하위 디렉토리 중 파일이 많은 것
+	if len(scopes) > 0 && len(dirCounts) > 5 {
+		primaryScope := scopes[0]
+		for dir, count := range dirCounts {
+			if strings.HasPrefix(dir, primaryScope+string(filepath.Separator)) &&
+				sourceDirs[dir] &&
+				count >= 3 {
+				// 하위 디렉토리 이름만 추출
+				subDir := strings.TrimPrefix(dir, primaryScope+string(filepath.Separator))
+				if !strings.Contains(subDir, string(filepath.Separator)) {
+					scopes = append(scopes, simplifyScopeName(subDir))
+					break
+				}
 			}
 		}
 	}
 
-	return result
+	// 5. scope 너무 많으면 제한 (최대 2개)
+	if len(scopes) > 2 {
+		scopes = scopes[:2]
+	}
+
+	return scopes
+}
+
+// findCommonPrefix는 모든 파일의 공통 경로 접두사를 찾습니다.
+func findCommonPrefix(files []FileChange) string {
+	if len(files) == 0 {
+		return ""
+	}
+
+	paths := make([][]string, len(files))
+	for i, file := range files {
+		paths[i] = strings.Split(filepath.Clean(file.Path), string(filepath.Separator))
+	}
+
+	common := paths[0]
+	for i := 1; i < len(paths); i++ {
+		common = commonPrefix(common, paths[i])
+		if len(common) == 0 {
+			return ""
+		}
+	}
+
+	// 마지막이 파일 이름인 경우 제거
+	if len(common) > 1 {
+		return strings.Join(common[:len(common)-1], "/")
+	} else if len(common) == 1 && isDirectoryName(common[0]) {
+		return common[0]
+	}
+	return ""
+}
+
+// commonPrefix는 두 경로 배열의 공통 접두사를 반환합니다.
+func commonPrefix(a, b []string) []string {
+	minLen := len(a)
+	if len(b) < minLen {
+		minLen = len(b)
+	}
+
+	i := 0
+	for i < minLen && a[i] == b[i] {
+		i++
+	}
+
+	return a[:i]
+}
+
+// isDirectoryName은 이름이 디렉토리 이름일 가능성이 있는지 확인합니다.
+func isDirectoryName(name string) bool {
+	// 확장자가 없거나 일반적인 확장자가 아니면 디렉토리로 간주
+	ext := filepath.Ext(name)
+	if ext == "" {
+		return true
+	}
+
+	// 일반적인 파일 확장자
+	commonExts := []string{".go", ".js", ".ts", ".jsx", ".tsx", ".py", ".java", ".kt", ".rb", ".php",
+		".cs", ".cpp", ".c", ".h", ".hpp", ".swift", ".rs", ".dart", ".lua", ".r",
+		".json", ".xml", ".yaml", ".yml", ".toml", ".ini", ".conf", ".cfg", ".md", ".txt"}
+
+	for _, commonExt := range commonExts {
+		if ext == commonExt {
+			return false
+		}
+	}
+
+	return true
+}
+
+// simplifyScopeName은 scope 이름을 단순화합니다.
+func simplifyScopeName(scope string) string {
+	// 너무 긴 scope는 줄이기
+	if len(scope) > 20 {
+		parts := strings.Split(scope, "/")
+		if len(parts) > 1 {
+			return parts[len(parts)-1] // 마지막 부분만
+		}
+		return scope[:20]
+	}
+	return scope
 }
