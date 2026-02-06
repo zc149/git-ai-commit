@@ -17,11 +17,11 @@ func GeneratePrompt(diff *git.DiffResult, detail string, lang string) string {
 		builder.WriteString("Generate Conventional Commit messages based on the following information.\n\n")
 	}
 
-	// 추천 타입
+	// 추천 타입과 설명
 	if lang == "ko" {
-		builder.WriteString(fmt.Sprintf("추천 타입: %s\n", diff.CommitType))
+		builder.WriteString(fmt.Sprintf("추천 타입: %s (%s)\n", diff.CommitType, getCommitTypeDescription(diff.CommitType, lang)))
 	} else {
-		builder.WriteString(fmt.Sprintf("Recommended type: %s\n", diff.CommitType))
+		builder.WriteString(fmt.Sprintf("Recommended type: %s (%s)\n", diff.CommitType, getCommitTypeDescription(diff.CommitType, lang)))
 	}
 
 	// 추천 scope
@@ -34,6 +34,26 @@ func GeneratePrompt(diff *git.DiffResult, detail string, lang string) string {
 	}
 
 	builder.WriteString("\n")
+
+	// 변경 패턴 분석
+	changePattern := analyzeChangePattern(diff.Files, lang)
+	if changePattern != "" {
+		if lang == "ko" {
+			builder.WriteString("변경 패턴: " + changePattern + "\n\n")
+		} else {
+			builder.WriteString("Change pattern: " + changePattern + "\n\n")
+		}
+	}
+
+	// 디렉토리 구조 분석
+	dirAnalysis := analyzeDirectoryStructure(diff.Files, lang)
+	if dirAnalysis != "" {
+		if lang == "ko" {
+			builder.WriteString("디렉토리 구조:\n" + dirAnalysis + "\n")
+		} else {
+			builder.WriteString("Directory structure:\n" + dirAnalysis + "\n")
+		}
+	}
 
 	// 변경 내용 요약
 	if lang == "ko" {
@@ -178,4 +198,200 @@ func summarizeChanges(changes string) string {
 	return summary
 }
 
-// Add language support
+// getCommitTypeDescription는 커밋 타입에 대한 설명을 반환합니다.
+func getCommitTypeDescription(commitType string, lang string) string {
+	descriptions := map[string]map[string]string{
+		"feat": {
+			"ko": "새로운 기능 추가",
+			"en": "New feature addition",
+		},
+		"fix": {
+			"ko": "버그 수정",
+			"en": "Bug fix",
+		},
+		"build": {
+			"ko": "빌드 시스템 또는 의존성 변경",
+			"en": "Build system or dependency changes",
+		},
+		"docs": {
+			"ko": "문서 변경",
+			"en": "Documentation changes",
+		},
+		"test": {
+			"ko": "테스트 코드 추가 또는 수정",
+			"en": "Test code additions or modifications",
+		},
+		"refactor": {
+			"ko": "코드 리팩토링 (기능 변경 없음)",
+			"en": "Code refactoring (no functional changes)",
+		},
+		"chore": {
+			"ko": "기타 작업 (설정, 빌드 등)",
+			"en": "Other tasks (config, build, etc.)",
+		},
+	}
+
+	if desc, ok := descriptions[commitType]; ok {
+		if d, ok2 := desc[lang]; ok2 {
+			return d
+		}
+		return desc["en"]
+	}
+	return ""
+}
+
+// analyzeChangePattern은 변경 패턴을 분석하여 설명을 반환합니다.
+func analyzeChangePattern(files []git.FileChange, lang string) string {
+	if len(files) == 0 {
+		return ""
+	}
+
+	newFiles := 0
+	deletedFiles := 0
+	sourceFiles := 0
+	configFiles := 0
+	testFiles := 0
+
+	newDirectories := make(map[string]bool)
+
+	for _, file := range files {
+		if file.IsNew {
+			newFiles++
+		}
+		if file.IsDeleted {
+			deletedFiles++
+		}
+
+		switch file.FileType {
+		case git.FileTypeSource:
+			sourceFiles++
+		case git.FileTypeConfig:
+			configFiles++
+		case git.FileTypeTest:
+			testFiles++
+		}
+
+		// 새 디렉토리 추적
+		if file.IsNew {
+			parts := strings.Split(file.Path, "/")
+			if len(parts) >= 2 {
+				dir := strings.Join(parts[:len(parts)-1], "/")
+				newDirectories[dir] = true
+			}
+		}
+	}
+
+	var pattern string
+
+	// 변경 패턴 결정
+	if newFiles > 0 && deletedFiles == 0 && sourceFiles >= 3 {
+		if lang == "ko" {
+			pattern = "새로운 기능/모듈 추가"
+		} else {
+			pattern = "New feature/module addition"
+		}
+	} else if deletedFiles > 0 {
+		if lang == "ko" {
+			pattern = "코드/파일 삭제"
+		} else {
+			pattern = "Code/file deletion"
+		}
+	} else if testFiles > 0 && sourceFiles == 0 {
+		if lang == "ko" {
+			pattern = "테스트 코드 변경"
+		} else {
+			pattern = "Test code changes"
+		}
+	} else if configFiles > 0 && sourceFiles == 0 {
+		if lang == "ko" {
+			pattern = "설정 파일 변경"
+		} else {
+			pattern = "Configuration file changes"
+		}
+	} else if sourceFiles > 0 && newFiles == 0 {
+		if lang == "ko" {
+			pattern = "기존 코드 수정"
+		} else {
+			pattern = "Existing code modifications"
+		}
+	} else {
+		if lang == "ko" {
+			pattern = "일반적인 코드 변경"
+		} else {
+			pattern = "General code changes"
+		}
+	}
+
+	return pattern
+}
+
+// analyzeDirectoryStructure는 디렉토리 구조를 분석하여 요약을 반환합니다.
+func analyzeDirectoryStructure(files []git.FileChange, lang string) string {
+	if len(files) == 0 {
+		return ""
+	}
+
+	type dirInfo struct {
+		total    int
+		source   int
+		config   int
+		test     int
+		doc      int
+		newFiles int
+	}
+
+	dirStats := make(map[string]*dirInfo)
+
+	for _, file := range files {
+		parts := strings.Split(file.Path, "/")
+		if len(parts) == 0 {
+			continue
+		}
+
+		// 첫 번째 디렉토리 기준 집계
+		dir := parts[0]
+		if dir == "" {
+			continue
+		}
+
+		if _, ok := dirStats[dir]; !ok {
+			dirStats[dir] = &dirInfo{}
+		}
+
+		info := dirStats[dir]
+		info.total++
+
+		switch file.FileType {
+		case git.FileTypeSource:
+			info.source++
+		case git.FileTypeConfig:
+			info.config++
+		case git.FileTypeTest:
+			info.test++
+		case git.FileTypeDoc:
+			info.doc++
+		}
+
+		if file.IsNew {
+			info.newFiles++
+		}
+	}
+
+	if len(dirStats) == 0 {
+		return ""
+	}
+
+	var builder strings.Builder
+
+	for dir, info := range dirStats {
+		if lang == "ko" {
+			builder.WriteString(fmt.Sprintf("- %s: 총 %d개 (소스: %d, 설정: %d, 테스트: %d, 문서: %d, 새 파일: %d)\n",
+				dir, info.total, info.source, info.config, info.test, info.doc, info.newFiles))
+		} else {
+			builder.WriteString(fmt.Sprintf("- %s: total %d (source: %d, config: %d, test: %d, doc: %d, new: %d)\n",
+				dir, info.total, info.source, info.config, info.test, info.doc, info.newFiles))
+		}
+	}
+
+	return builder.String()
+}
