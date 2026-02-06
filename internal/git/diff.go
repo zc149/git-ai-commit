@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"git-ai-commit/internal/worker"
 )
 
 // FileType은 파일의 유형을 나타냅니다.
@@ -75,17 +77,65 @@ func GetCachedDiff() (*DiffResult, error) {
 		}, nil
 	}
 
-	// diff 파싱
-	result, err := ParseDiff(rawDiff)
+	// 병렬 diff 파싱 시도
+	fileCount := estimateFileCount(rawDiff)
+	workers := worker.GetOptimalWorkerCount(fileCount)
+
+	parsedFiles, err := worker.ParseDiffParallel(rawDiff, workers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse diff: %w", err)
 	}
 
-	result.RawDiff = rawDiff
+	var result *DiffResult
+
+	// 병렬 파싱 결과가 있으면 사용, 없으면 순차 파싱
+	if parsedFiles != nil {
+		result = &DiffResult{
+			Files:   convertParsedFiles(parsedFiles),
+			RawDiff: rawDiff,
+		}
+	} else {
+		// 순차 파싱
+		result, err = ParseDiff(rawDiff)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse diff: %w", err)
+		}
+		result.RawDiff = rawDiff
+	}
+
 	result.CommitType = InferCommitType(result.Files)
 	result.Scopes = InferScopes(result.Files)
 
 	return result, nil
+}
+
+// convertParsedFiles는 worker.ParsedFile을 git.FileChange로 변환합니다.
+func convertParsedFiles(parsedFiles []worker.ParsedFile) []FileChange {
+	files := make([]FileChange, len(parsedFiles))
+	for i, pf := range parsedFiles {
+		files[i] = FileChange{
+			Path:      pf.Path,
+			FileType:  FileType(pf.FileType),
+			IsNew:     pf.IsNew,
+			IsDeleted: pf.IsDeleted,
+			Changes:   pf.Changes,
+		}
+	}
+	return files
+}
+
+// estimateFileCount는 diff에서 대략적인 파일 수를 추정합니다.
+func estimateFileCount(diff string) int {
+	count := 0
+	scanner := bufio.NewScanner(strings.NewReader(diff))
+
+	for scanner.Scan() {
+		if strings.HasPrefix(scanner.Text(), "diff --git") {
+			count++
+		}
+	}
+
+	return count
 }
 
 // ParseDiff는 diff 문자열을 구조체로 변환합니다.
