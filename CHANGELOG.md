@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - Unreleased
+
+### Added
+- 커밋 메시지 재추천 기능 (r 키): 후보가 마음에 안 들 때 새로운 후보 생성
+- 캐시 시스템: 선택한 메시지를 diff hash 기반으로 저장
+- 이전 메시지 사용 기능 (p 키): 같은 diff로 다시 시도할 때 캐시된 메시지 재사용
+- 컨트롤 플로우 개선을 위한 에러 타입 (RegenerateError, UsePrevMessageError)
+
+### Improved
+- 사용자 경험 개선: 마음에 안 드는 후보를 계속 재생성 가능
+- 반복 작업 효율성: 좋은 메시지를 찾으면 다음에 바로 재사용 가능
+
+### Technical Details
+- `internal/cache/cache.go`: 캐시 매니저, diff hash 기반 캐싱
+- `internal/ui/selector.go`: 재추천 옵션, 이전 메시지 옵션, 커스텀 에러 타입
+- `cmd/root.go`: 캐시 통합, 재추천 루프, 메시지 선택 로직
+- `internal/git/diff.go`: diff hash 계산 함수
+
+상세 내용은 [docs/refactoring/v0.4.0-message-iteration-and-cache.md](docs/refactoring/v0.4.0-message-iteration-and-cache.md) 참고
+
 ## [0.3.0] - 2026-02-06
 
 ### Added
