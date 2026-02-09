@@ -3,6 +3,7 @@ package cmd
 import (
 	"flag"
 	"fmt"
+	"git-ai-commit/internal/cache"
 	"git-ai-commit/internal/config"
 	"git-ai-commit/internal/core"
 	"git-ai-commit/internal/git"
@@ -58,12 +59,27 @@ func (r *RootCommand) Run() error {
 		return fmt.Errorf("%s: %w", r.getMessage("error_diff_failed", lang), err)
 	}
 
+	// diff hash 계산
+	diffHash := git.CalculateDiffHash(diffResult.RawDiff)
+
 	fmt.Printf("\n📊 %s: %s\n", r.getMessage("label_recommended_type", lang), diffResult.CommitType)
 	if len(diffResult.Scopes) > 0 {
 		fmt.Printf("   %s: %s\n", r.getMessage("label_recommended_scope", lang), diffResult.Scopes)
 	}
 
-	// 3. 사용할 모델 결정
+	// 3. 캐시 매니저 초기화 및 이전 메시지 로드
+	cacheManager, err := cache.NewCacheManager()
+	if err != nil {
+		return fmt.Errorf("캐시 매니저 생성 실패: %w", err)
+	}
+
+	cachedData, err := cacheManager.Load(diffHash)
+	var prevMessage string
+	if err == nil && cachedData != nil {
+		prevMessage = cachedData.Message
+	}
+
+	// 4. 사용할 모델 결정
 	model := r.config.Model
 	if model == "" {
 		model = r.config.GetFirstAvailableModel()
@@ -87,7 +103,7 @@ func (r *RootCommand) Run() error {
 		return fmt.Errorf("%s: %w", r.getMessage("error_create_provider", lang), err)
 	}
 
-	// 6. 커밋 메시지 생성
+	// 5. 커밋 메시지 생성
 	detail := r.getDetailLevel()
 	fmt.Printf("📝 %s: %s\n", r.getMessage("label_detail_level", lang), detail)
 	fmt.Println("\n🔄 " + r.getMessage("generating_messages", lang))
@@ -99,11 +115,44 @@ func (r *RootCommand) Run() error {
 
 	fmt.Println("✅ " + r.getMessage("candidates_generated", lang))
 
-	// 7. 사용자 선택
+	// 6. 사용자 선택 (재추천 루프)
 	selector := ui.NewSelector(lang)
-	selectedMessage, err := selector.Select(messages)
-	if err != nil {
-		return err
+	var selectedMessage string
+
+	for {
+		selectedMessage, err = selector.Select(messages, prevMessage)
+
+		// 에러 타입 확인
+		if err != nil {
+			// 재추천 요청
+			if _, ok := err.(*ui.RegenerateError); ok {
+				fmt.Println("\n🔄 " + r.getMessage("regenerating_messages", lang))
+				messages, err = generator.Generate(diffResult, detail, lang)
+				if err != nil {
+					return fmt.Errorf("%s: %w", r.getMessage("error_generate_failed", lang), err)
+				}
+				fmt.Println("✅ " + r.getMessage("candidates_generated", lang))
+				continue
+			}
+
+			// 이전 메시지 사용
+			if prevMsgErr, ok := err.(*ui.UsePrevMessageError); ok {
+				selectedMessage = prevMsgErr.Message
+				break
+			}
+
+			// 그 외 에러 (종료 등)
+			return err
+		}
+
+		// 정상 선택
+		break
+	}
+
+	// 7. 선택한 메시지 캐시에 저장
+	if err := cacheManager.Save(diffHash, selectedMessage); err != nil {
+		// 캐시 저장 실패는 치명적이지 않으므로 계속 진행
+		fmt.Println("⚠️ " + r.getMessage("warning_cache_save_failed", lang))
 	}
 
 	// 8. 커밋 실행
@@ -245,6 +294,14 @@ func (r *RootCommand) getMessage(key, lang string) string {
 		"candidates_generated": {
 			"en": "Commit message candidates generated",
 			"ko": "커밋 메시지 후보가 생성되었습니다",
+		},
+		"regenerating_messages": {
+			"en": "Regenerating candidates...",
+			"ko": "새로운 후보를 생성 중...",
+		},
+		"warning_cache_save_failed": {
+			"en": "Failed to save commit message to cache",
+			"ko": "커밋 메시지 캐시 저장 실패",
 		},
 		"executing_commit": {
 			"en": "Executing commit...",

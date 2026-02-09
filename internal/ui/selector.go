@@ -8,6 +8,22 @@ import (
 	"strings"
 )
 
+// RegenerateError는 재추천 요청을 나타내는 에러입니다.
+type RegenerateError struct{}
+
+func (e *RegenerateError) Error() string {
+	return "regenerate requested"
+}
+
+// UsePrevMessageError는 이전 메시지 사용 요청을 나타내는 에러입니다.
+type UsePrevMessageError struct {
+	Message string
+}
+
+func (e *UsePrevMessageError) Error() string {
+	return "use previous message"
+}
+
 // Selector는 사용자가 커밋 메시지 후보 중 하나를 선택할 수 있게 하는 인터페이스입니다.
 type Selector struct {
 	lang string
@@ -21,22 +37,29 @@ func NewSelector(lang string) *Selector {
 }
 
 // Select는 사용자에게 후보 메시지들을 보여주고 선택을 받습니다.
-func (s *Selector) Select(messages []string) (string, error) {
+func (s *Selector) Select(messages []string, prevMessage string) (string, error) {
 	if len(messages) == 0 {
 		return "", fmt.Errorf(s.getMessage("error_no_candidates"))
 	}
 
 	fmt.Println("\n" + s.getMessage("header_candidates"))
+
+	// 이전 메시지가 있으면 표시
+	if prevMessage != "" {
+		fmt.Printf("p) %s\n", s.formatPrevMessage(prevMessage))
+	}
+
 	for i, msg := range messages {
 		s.displayFormattedMessage(i+1, msg)
 	}
 	fmt.Println(s.getMessage("option_custom"))
+	fmt.Println(s.getMessage("option_regenerate"))
 	fmt.Println(s.getMessage("option_quit"))
 
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
-		fmt.Printf("\n%s: ", s.formatPrompt(len(messages)))
+		fmt.Printf("\n%s: ", s.formatPrompt(len(messages), prevMessage != ""))
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			return "", fmt.Errorf(s.getMessage("error_read_input"), err)
@@ -47,6 +70,20 @@ func (s *Selector) Select(messages []string) (string, error) {
 		// 종료
 		if choice == "q" || choice == "Q" {
 			return "", fmt.Errorf(s.getMessage("error_user_quit"))
+		}
+
+		// 이전 메시지 사용
+		if choice == "p" || choice == "P" {
+			if prevMessage != "" {
+				return "", &UsePrevMessageError{Message: prevMessage}
+			}
+			fmt.Println(s.getMessage("error_no_prev_message"))
+			continue
+		}
+
+		// 재추천
+		if choice == "r" || choice == "R" {
+			return "", &RegenerateError{}
 		}
 
 		// 직접 입력
@@ -132,10 +169,6 @@ func (s *Selector) getMessage(key string) string {
 			"en": "q) Quit",
 			"ko": "q) 종료",
 		},
-		"prompt_select": {
-			"en": "Select (1-%d or c/q)",
-			"ko": "선택 (1-%d 또는 c/q)",
-		},
 		"error_read_input": {
 			"en": "Failed to read input: %v",
 			"ko": "입력 읽기 실패: %v",
@@ -168,6 +201,22 @@ func (s *Selector) getMessage(key string) string {
 			"en": "=== Git Diff ===",
 			"ko": "=== Git Diff ===",
 		},
+		"option_regenerate": {
+			"en": "r) Regenerate candidates",
+			"ko": "r) 재추천 받기",
+		},
+		"error_no_prev_message": {
+			"en": "No previous message available.",
+			"ko": "이전 메시지가 없습니다.",
+		},
+		"prompt_select": {
+			"en": "Select (1-%d or c/r/q)",
+			"ko": "선택 (1-%d 또는 c/r/q)",
+		},
+		"prompt_select_with_prev": {
+			"en": "Select (p/1-%d or c/r/q)",
+			"ko": "선택 (p/1-%d 또는 c/r/q)",
+		},
 	}
 
 	if msgMap, ok := messages[key]; ok {
@@ -180,9 +229,21 @@ func (s *Selector) getMessage(key string) string {
 }
 
 // formatPrompt는 선택 프롬프트를 언어에 맞게 포맷팅합니다.
-func (s *Selector) formatPrompt(count int) string {
+func (s *Selector) formatPrompt(count int, hasPrev bool) string {
+	if hasPrev {
+		prompt := s.getMessage("prompt_select_with_prev")
+		return fmt.Sprintf(prompt, count)
+	}
 	prompt := s.getMessage("prompt_select")
 	return fmt.Sprintf(prompt, count)
+}
+
+// formatPrevMessage는 이전 메시지를 포맷팅합니다.
+func (s *Selector) formatPrevMessage(msg string) string {
+	if s.lang == "ko" {
+		return "이전 메시지 사용 (" + msg + ")"
+	}
+	return "Use previous message (" + msg + ")"
 }
 
 // displayFormattedMessage는 메시지를 포맷팅하여 표시합니다.
@@ -205,4 +266,5 @@ func (s *Selector) displayFormattedMessage(index int, msg string) {
 		}
 	}
 }
+
 // Add structured format for high detail level

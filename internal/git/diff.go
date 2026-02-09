@@ -3,6 +3,8 @@ package git
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -635,4 +637,10 @@ func simplifyScopeName(scope string) string {
 		return scope[:20]
 	}
 	return scope
+}
+
+// CalculateDiffHash는 diff 내용의 SHA256 해시를 계산합니다.
+func CalculateDiffHash(rawDiff string) string {
+	hash := sha256.Sum256([]byte(rawDiff))
+	return hex.EncodeToString(hash[:])
 }
