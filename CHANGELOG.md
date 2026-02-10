@@ -11,6 +11,10 @@ All notable changes to this project will be documented in this file.
 - 컨트롤 플로우 개선을 위한 에러 타입 (RegenerateError, UsePrevMessageError)
 
 ### Fixed
+- **치명적 버그**: 대규모 커밋(17개 이상 파일)에서 deadlock 발생 문제 해결
+  - 원인: 결과 수집 goroutine이 작업 전송 후 시작되어 output 채널이 가득 참
+  - 해결: 결과 수집 goroutine을 먼저 시작하여 Producer-Consumer 패턴 정석 적용
+  - 영향 범위: `internal/worker/pool.go`의 `ParseDiffParallel()` 함수
 - detail 기본값이 medium으로 나오는 문제: 기본값을 low로 수정
 - high 디테일 레벨에서 짧은 메시지가 나오는 문제: 다중 줄 파싱 로직 개선
 - feat를 build로 잘못 분류하는 문제: 의존성 파일이 있더라도 새 소스 파일이 많으면 feat로 분류하도록 로직 개선

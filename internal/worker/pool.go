@@ -151,17 +151,17 @@ func ParseDiffParallel(diff string, workers int) ([]ParsedFile, error) {
 	pool := NewWorkerPool(workers)
 	pool.Start()
 
-	// 작업 제출
-	for i, fileDiff := range fileDiffs {
-		pool.Submit(fileDiff, i)
-	}
-
-	// 결과를 수집할 채널 (별도 goroutine에서 수집 시작)
+	// 결과를 수집할 채널 (별도 goroutine에서 수집 시작) - 먼저 시작!
 	resultChan := make(chan []ParsedFile, 1)
 	go func() {
 		results := pool.Results()
 		resultChan <- results
 	}()
+
+	// 작업 제출
+	for i, fileDiff := range fileDiffs {
+		pool.Submit(fileDiff, i)
+	}
 
 	// 작업 완료 대기 (결과 수집은 별도 goroutine에서 진행 중)
 	pool.Close()
