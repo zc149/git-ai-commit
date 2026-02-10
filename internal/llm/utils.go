@@ -5,18 +5,43 @@ func parseCommitMessages(text string) []string {
 	var messages []string
 	lines := splitLines(text)
 
-	for _, line := range lines {
-		line = trimWhitespace(line)
+	i := 0
+	for i < len(lines) {
+		line := trimWhitespace(lines[i])
 		if line == "" {
+			i++
 			continue
 		}
 
 		// "1) ", "2) ", "1. ", "2. " 등의 패턴 감지
 		if isNumberedFormat(line) {
 			msg := removeNumberPrefix(line)
+
+			// 다음 줄들을 계속 수집 (다음 번호나 빈 줄이 나올 때까지)
+			i++
+			for i < len(lines) {
+				nextLine := trimWhitespace(lines[i])
+
+				// 빈 줄이거나 다음 번호가 나오면 중지
+				if nextLine == "" || isNumberedFormat(nextLine) {
+					break
+				}
+
+				// 들여쓰기된 줄이나 연속된 내용을 추가
+				if msg != "" {
+					msg += "\n" + nextLine
+				} else {
+					msg = nextLine
+				}
+
+				i++
+			}
+
 			if msg != "" {
 				messages = append(messages, msg)
 			}
+		} else {
+			i++
 		}
 	}
 

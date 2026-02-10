@@ -10,9 +10,17 @@ All notable changes to this project will be documented in this file.
 - 이전 메시지 사용 기능 (p 키): 같은 diff로 다시 시도할 때 캐시된 메시지 재사용
 - 컨트롤 플로우 개선을 위한 에러 타입 (RegenerateError, UsePrevMessageError)
 
+### Fixed
+- detail 기본값이 medium으로 나오는 문제: 기본값을 low로 수정
+- high 디테일 레벨에서 짧은 메시지가 나오는 문제: 다중 줄 파싱 로직 개선
+- feat를 build로 잘못 분류하는 문제: 의존성 파일이 있더라도 새 소스 파일이 많으면 feat로 분류하도록 로직 개선
+- scope에 모든 파일 이름이 나오는 문제: 소스 파일이 있는 최상위 디렉토리만 집계하여 더 간결한 scope 추천
+
 ### Improved
 - 사용자 경험 개선: 마음에 안 드는 후보를 계속 재생성 가능
 - 반복 작업 효율성: 좋은 메시지를 찾으면 다음에 바로 재사용 가능
+- 커밋 타입 분류 정확도: 새 기능 추가 시 의존성 업데이트가 있더라도 feat로 정확하게 분류
+- Scope 추천 품질: 과도한 파일 나열 문제 해결, 더 간결하고 정확한 scope 제공
 
 ### Technical Details
 - `internal/cache/cache.go`: 캐시 매니저, diff hash 기반 캐싱

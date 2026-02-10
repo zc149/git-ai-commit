@@ -331,9 +331,9 @@ func InferCommitType(files []FileChange) string {
 		typeScore["feat"] += 20
 	}
 
-	// 새 소스 파일이 3개 이상 = 새 기능
+	// 새 소스 파일이 3개 이상 = 새 기능 (가중치 증가)
 	if newSourceFileCount >= 3 {
-		typeScore["feat"] += 15
+		typeScore["feat"] += 20
 	}
 
 	// 의존성 파일만 변경됨 = build
@@ -346,6 +346,13 @@ func InferCommitType(files []FileChange) string {
 	if hasRegularConfig && sourceFileCount == 0 && !hasDependencyFile {
 		typeScore["chore"] += 10
 		typeScore["build"] -= 5
+	}
+
+	// 의존성 파일이 있더라도 새 소스 파일이 많으면 build 점수 감소
+	// (새 기능 추가에 수반된 의존성 업데이트인 경우)
+	if hasDependencyFile && newSourceFileCount >= 3 {
+		typeScore["build"] -= 10
+		typeScore["feat"] += 10
 	}
 
 	// 최대 점수 타입 선택
@@ -477,37 +484,24 @@ func InferScopes(files []FileChange) []string {
 		return []string{}
 	}
 
-	// 1. 디렉토리별 파일 수 집계
-	dirCounts := make(map[string]int)
-	sourceDirs := make(map[string]bool) // 소스 파일이 있는 디렉토리
-	configDirs := make(map[string]bool) // 설정 파일만 있는 디렉토리
-
+	// 1. 최상위 디렉토리별 소스 파일 수 집계
+	topLevelDirs := make(map[string]int) // 최상위 디렉토리별 소스 파일 수
 	for _, file := range files {
+		if file.FileType != FileTypeSource {
+			continue
+		}
+
 		path := file.Path
 		parts := strings.Split(filepath.Clean(path), string(filepath.Separator))
-
-		// 각 레벨의 디렉토리 집계
-		for i := 1; i < len(parts); i++ {
-			dir := strings.Join(parts[:i], string(filepath.Separator))
-			dirCounts[dir]++
+		if len(parts) > 0 {
+			topDir := parts[0]
+			topLevelDirs[topDir]++
 		}
+	}
 
-		// 파일 유형별 분류
-		if file.FileType == FileTypeSource {
-			// 소스 파일의 모든 상위 디렉토리 표시
-			for i := 1; i < len(parts); i++ {
-				dir := strings.Join(parts[:i], string(filepath.Separator))
-				sourceDirs[dir] = true
-			}
-		} else if file.FileType == FileTypeConfig {
-			// 설정 파일만 있는 디렉토리 확인
-			for i := 1; i < len(parts); i++ {
-				dir := strings.Join(parts[:i], string(filepath.Separator))
-				if !sourceDirs[dir] {
-					configDirs[dir] = true
-				}
-			}
-		}
+	// 소스 파일이 하나도 없으면 빈 스코프 반환
+	if len(topLevelDirs) == 0 {
+		return []string{}
 	}
 
 	// 2. 최대 공통 디렉토리 찾기
@@ -519,13 +513,15 @@ func InferScopes(files []FileChange) []string {
 	if commonPrefix != "" {
 		// 공통 접두사가 있으면 그걸 메인 scope로
 		scopes = append(scopes, simplifyScopeName(commonPrefix))
+	} else if len(topLevelDirs) >= 3 {
+		// 3개 이상의 다른 최상위 디렉토리에 소스 파일이 있으면 "multiple" 사용
+		scopes = append(scopes, "multiple")
 	} else {
-		// 공통 접두사가 없으면 소스 파일이 있는 디렉토리 중에서
-		// 가장 파일이 많은 것 선택
+		// 소스 파일이 가장 많은 최상위 디렉토리 선택
 		maxCount := 0
 		var primaryDir string
-		for dir, count := range dirCounts {
-			if sourceDirs[dir] && count > maxCount {
+		for dir, count := range topLevelDirs {
+			if count > maxCount {
 				maxCount = count
 				primaryDir = dir
 			}
@@ -533,29 +529,6 @@ func InferScopes(files []FileChange) []string {
 		if primaryDir != "" {
 			scopes = append(scopes, simplifyScopeName(primaryDir))
 		}
-	}
-
-	// 4. 2번째 scope (필요한 경우)
-	// 메인 scope의 바로 하위 디렉토리 중 파일이 많은 것
-	if len(scopes) > 0 && len(dirCounts) > 5 {
-		primaryScope := scopes[0]
-		for dir, count := range dirCounts {
-			if strings.HasPrefix(dir, primaryScope+string(filepath.Separator)) &&
-				sourceDirs[dir] &&
-				count >= 3 {
-				// 하위 디렉토리 이름만 추출
-				subDir := strings.TrimPrefix(dir, primaryScope+string(filepath.Separator))
-				if !strings.Contains(subDir, string(filepath.Separator)) {
-					scopes = append(scopes, simplifyScopeName(subDir))
-					break
-				}
-			}
-		}
-	}
-
-	// 5. scope 너무 많으면 제한 (최대 2개)
-	if len(scopes) > 2 {
-		scopes = scopes[:2]
 	}
 
 	return scopes

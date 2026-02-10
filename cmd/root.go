@@ -229,7 +229,7 @@ func (r *RootCommand) getDetailLevel() string {
 	if r.detail != "" {
 		return r.detail
 	}
-	return getEnvWithDefault("AI_COMMIT_DETAIL", "medium")
+	return getEnvWithDefault("AI_COMMIT_DETAIL", "low")
 }
 
 // getMessage는 언어에 따른 메시지를 반환합니다.
