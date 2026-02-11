@@ -9,6 +9,7 @@ import (
 	"git-ai-commit/internal/git"
 	"git-ai-commit/internal/llm"
 	"git-ai-commit/internal/ui"
+	"git-ai-commit/internal/version"
 	"os"
 )
 
@@ -170,11 +171,18 @@ func (r *RootCommand) Run() error {
 // RunWithArgs는 명령줄 인자를 받아 실행합니다.
 func RunWithArgs(args []string) error {
 	// 플래그 정의
+	versionFlag := flag.Bool("v", false, "버전 정보 출력")
 	detailFlag := flag.String("detail", "", "디테일 레벨: low, medium, high")
 	langFlag := flag.String("lang", "", "언어: en, ko")
 
 	// 플래그 파싱
 	flag.CommandLine.Parse(args)
+
+	// 버전 출력
+	if *versionFlag {
+		fmt.Printf("git-ai-commit %s\n", version.Version)
+		return nil
+	}
 
 	// 디테일 레벨 유효성 검사
 	if *detailFlag != "" {
