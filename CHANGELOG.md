@@ -2,7 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.4.0] - Unreleased
+## [1.5.0] - Unreleased
+
+### Added
+- `-v` 플래그로 버전 정보 출력 기능
+- 빌드 타임 버전 주입 시스템 (ldflags 사용)
+
+### Technical Details
+- `internal/version/version.go`: 버전 변수 정의 (기본값 "dev")
+- `cmd/root.go`: version 플래그 및 출력 로직 추가
+- `build.sh`: 빌드 시점에 버전 주입 (`-X git-ai-commit/internal/version.Version=${VERSION}`)
+
+상세 내용은 [docs/refactoring/v1.5.0-version-flag-support.md](docs/refactoring/v1.5.0-version-flag-support.md) 참고
+
+## [1.4.0] - 2026-02-10
 
 ### Added
 - 커밋 메시지 재추천 기능 (r 키): 후보가 마음에 안 들 때 새로운 후보 생성
@@ -32,9 +45,9 @@ All notable changes to this project will be documented in this file.
 - `cmd/root.go`: 캐시 통합, 재추천 루프, 메시지 선택 로직
 - `internal/git/diff.go`: diff hash 계산 함수
 
-상세 내용은 [docs/refactoring/v0.4.0-message-iteration-and-cache.md](docs/refactoring/v0.4.0-message-iteration-and-cache.md) 참고
+상세 내용은 [docs/refactoring/v1.4.0-message-iteration-and-cache.md](docs/refactoring/v1.4.0-message-iteration-and-cache.md) 참고
 
-## [0.3.0] - 2026-02-06
+## [1.3.0] - 2026-02-06
 
 ### Added
 - Worker Pool 패턴 도입으로 병렬 diff 파싱 기능 추가
@@ -53,9 +66,9 @@ All notable changes to this project will be documented in this file.
 - `internal/git/diff.go`: ParseDiffParallel 통합, convertParsedFiles 함수
 - 순환 참조 문제 해결 (worker 패키지 독립화)
 
-상세 내용은 [docs/refactoring/v0.3.0-parallel-diff-parsing.md](docs/refactoring/v0.3.0-parallel-diff-parsing.md) 참고
+상세 내용은 [docs/refactoring/v1.3.0-parallel-diff-parsing.md](docs/refactoring/v1.3.0-parallel-diff-parsing.md) 참고
 
-## [0.2.0] - 2025-02-06
+## [1.2.0] - 2025-02-06
 
 ### Added
 - 커밋 타입 자동 추론 기능 (feat, fix, build, docs, test, refactor, chore)
@@ -72,9 +85,9 @@ All notable changes to this project will be documented in this file.
 - `internal/git/diff.go`: InferCommitType, InferScopes 함수 구현
 - `internal/core/prompt.go`: 프롬프트 강화 (3개 분석 함수 추가)
 
-상세 내용은 [docs/refactoring/v0.2.0-ai-recommendation-improvement.md](docs/refactoring/v0.2.0-ai-recommendation-improvement.md) 참고
+상세 내용은 [docs/refactoring/v1.2.0-ai-recommendation-improvement.md](docs/refactoring/v1.2.0-ai-recommendation-improvement.md) 참고
 
-## [0.1.0] - 2025-02-05
+## [1.1.0] - 2025-02-05
 
 ### Initial Release
 - LLM 기반 커밋 메시지 생성
@@ -83,4 +96,4 @@ All notable changes to this project will be documented in this file.
 - 다국어 지원 (한국어, 영어)
 - 디테일 레벨 조절 (low, medium, high)
 
-상세 내용은 [docs/refactoring/v0.1.0-initial-release.md](docs/refactoring/v0.1.0-initial-release.md) 참고
+상세 내용은 [docs/refactoring/v1.1.0-initial-release.md](docs/refactoring/v1.1.0-initial-release.md) 참고
