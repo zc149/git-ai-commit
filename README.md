@@ -14,6 +14,46 @@ AI를 활용하여 Git 커밋 메시지를 자동으로 생성하는 CLI 도구�
 
 ## 설치
 
+### 🚀 빠른 시작 (개발자용)
+
+**소스 코드에서 바로 빌드해서 사용하고 싶다면:**
+
+**⚠️ Windows 사용자 주의:**
+- Windows에서는 **Git Bash**에서만 사용 가능합니다
+- CMD/PowerShell에서는 환경변수 전달 문제로 작동하지 않습니다
+- Git Bash는 Git for Windows 설치 시 자동으로 제공됩니다
+
+```bash
+# 1. 저장소 복제
+git clone https://github.com/zc149/git-ai-commit.git
+cd git-ai-commit
+
+# 2. 빌드
+go build -o git-ai-commit.exe main.go  # Windows
+go build -o git-ai-commit main.go       # macOS/Linux
+
+# 3. Git alias 설정 (필수!)
+git config --global alias.ai-commit "!$(pwd)/git-ai-commit.exe"  # Windows
+git config --global alias.ai-commit "!$(pwd)/git-ai-commit"       # macOS/Linux
+
+# 4. API 키 설정
+# Windows (Git Bash에서 실행)
+echo 'export AI_COMMIT_GROQ_API_KEY="your-api-key"' >> ~/.bashrc
+source ~/.bashrc
+
+# macOS/Linux
+echo 'export AI_COMMIT_GROQ_API_KEY="your-api-key"' >> ~/.zshrc  # 또는 ~/.bashrc
+source ~/.zshrc
+
+# 5. 사용 (Git Bash에서)
+git add .
+git ai-commit
+```
+
+---
+
+### 📦 바이너리 설치 (일반 사용자용)
+
 ### macOS
 
 #### Homebrew로 설치 (추천)
@@ -42,21 +82,49 @@ sudo mv ~/Downloads/git-ai-commit-darwin-arm64 /usr/local/bin/git-ai-commit
 
 ### Windows
 
-1. [GitHub Releases](https://github.com/zc149/git-ai-commit/releases) 페이지로 이동
-2. `git-ai-commit-windows-amd64.exe` 다운로드
-3. 폴더 생성 및 파일 이동:
+**⚠️ 중요: Windows에서는 Git Bash에서만 사용 가능합니다**
 
-```cmd
-mkdir C:\git-ai-commit
-move Downloads\git-ai-commit-windows-amd64.exe C:\git-ai-commit\git-ai-commit.exe
+Windows의 CMD/PowerShell은 git alias 실행 시 환경변수 전달 문제가 있어 **Git Bash**에서만 사용하세요.
+
+#### Git Bash에서 설치 (권장)
+
+```bash
+# 1. GitHub Releases에서 다운로드
+# https://github.com/zc149/git-ai-commit/releases/latest
+# git-ai-commit-windows-amd64.exe 다운로드
+
+# 2. 다운로드 폴더로 이동
+cd ~/Downloads
+
+# 3. 실행 권한 부여
+chmod +x git-ai-commit-windows-amd64.exe
+
+# 4. Git alias 설정
+git config --global alias.ai-commit "!$(pwd)/git-ai-commit-windows-amd64.exe"
+
+# 5. API 키 설정 (.bashrc에 추가)
+echo 'export AI_COMMIT_GROQ_API_KEY="your-api-key"' >> ~/.bashrc
+source ~/.bashrc
+
+# 6. 사용
+git add .
+git ai-commit
 ```
 
-4. PATH 환경변수에 `C:\git-ai-commit` 추가:
-   - Windows 키 + "시스템 환경 변수 편집" 검색
-   - "환경 변수" 클릭
-   - "사용자 변수"의 "Path" 선택 후 "편집" 클릭
-   - "새로 만들기" 클릭 후 `C:\git-ai-commit` 입력
-   - 확인 클릭
+#### 시스템 전체 설치 (Git Bash)
+
+```bash
+# 1. 폴더 생성 및 파일 이동
+mkdir -p ~/bin
+mv ~/Downloads/git-ai-commit-windows-amd64.exe ~/bin/git-ai-commit.exe
+
+# 2. Git alias 설정
+git config --global alias.ai-commit "!~/bin/git-ai-commit.exe"
+
+# 3. API 키 설정
+echo 'export AI_COMMIT_GROQ_API_KEY="your-api-key"' >> ~/.bashrc
+source ~/.bashrc
+```
 
 ### Linux
 
@@ -69,6 +137,9 @@ chmod +x git-ai-commit-linux-amd64
 
 # /usr/local/bin으로 이동
 sudo mv git-ai-commit-linux-amd64 /usr/local/bin/git-ai-commit
+
+# git alias 설정 (중요!)
+git config --global alias.ai-commit "!/usr/local/bin/git-ai-commit"
 ```
 
 ## 설치 확인
@@ -99,22 +170,19 @@ echo 'export AI_COMMIT_GROQ_API_KEY="your-groq-api-key"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-#### Windows (PowerShell)
+**⚠️ 중요:** API 키 설정 후 **새 터미널을 열어야** 환경변수가 적용됩니다.
 
-```powershell
-# 현재 세션에만 적용
-$env:AI_COMMIT_GROQ_API_KEY="your-groq-api-key"
+#### Windows (Git Bash만 지원)
 
-# 영구 적용
-[System.Environment]::SetEnvironmentVariable('AI_COMMIT_GROQ_API_KEY', 'your-groq-api-key', 'User')
+**Windows에서는 Git Bash에서만 사용 가능합니다.**
+
+```bash
+# 영구 적용 (~/.bashrc에 추가)
+echo 'export AI_COMMIT_GROQ_API_KEY="your-groq-api-key"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-#### Windows (CMD)
-
-```cmd
-# 영구 적용
-setx AI_COMMIT_GROQ_API_KEY "your-groq-api-key"
-```
+**⚠️ 주의:** CMD/PowerShell에서는 사용할 수 없습니다. **Git Bash**를 사용하세요.
 
 ## 사용법
 
