@@ -9,8 +9,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"git-ai-commit/internal/worker"
+)
+
+// 의존성 파일 Map (패키지 초기화 시 한 번만 생성)
+var (
+	dependencyFiles map[string]bool
+	depFileOnce     sync.Once
 )
 
 // FileType은 파일의 유형을 나타냅니다.
@@ -275,6 +282,7 @@ func InferCommitType(files []FileChange) string {
 
 	sourceFileCount := 0
 	newSourceFileCount := 0
+	modifiedSourceFileCount := 0
 	newDirectories := make(map[string]bool)
 
 	hasDependencyFile := false
@@ -295,12 +303,12 @@ func InferCommitType(files []FileChange) string {
 			sourceFileCount++
 			if file.IsNew {
 				newSourceFileCount++
-				// 새 소스 파일 추가는 feat에 강력한 점수
-				typeScore["feat"] += 10
-			} else {
-				// 기존 소스 파일 수정
-				typeScore["refactor"] += 3
-				typeScore["fix"] += 1
+				// 새 소스 파일 추가는 feat에 매우 강력한 점수
+				typeScore["feat"] += 15
+			} else if !file.IsDeleted {
+				modifiedSourceFileCount++
+				typeScore["refactor"] += 10
+				typeScore["fix"] += 5
 			}
 
 		case FileTypeTest:
@@ -311,48 +319,49 @@ func InferCommitType(files []FileChange) string {
 			}
 
 		case FileTypeDoc:
-			typeScore["docs"] += 8
+			typeScore["docs"] += 3
 
 		case FileTypeConfig:
 			if isDependencyFile(path) {
 				hasDependencyFile = true
-				// 의존성 변경 = build
-				typeScore["build"] += 5
+				// 의존성 변경 점수는 낮게 설정 (소스 파일이 우선)
+				typeScore["build"] += 2
 			} else {
 				hasRegularConfig = true
-				// 일반 설정 = chore
-				typeScore["chore"] += 3
+				// 일반 설정 점수도 낮게 설정
+				typeScore["chore"] += 2
 			}
 		}
 	}
 
-	// 새 디렉토리가 2개 이상 = 새 기능 추가
+	// 새 디렉토리가 2개 이상 = 새 기능 추가 (가중치 증가)
 	if len(newDirectories) >= 2 {
-		typeScore["feat"] += 20
+		typeScore["feat"] += 30
 	}
 
-	// 새 소스 파일이 3개 이상 = 새 기능 (가중치 증가)
-	if newSourceFileCount >= 3 {
-		typeScore["feat"] += 20
+	// 새 소스 파일이 2개 이상 = 새 기능 (임계값 낮춤, 가중치 증가)
+	if newSourceFileCount >= 2 {
+		typeScore["feat"] += 30
 	}
 
-	// 의존성 파일만 변경됨 = build
+	// 의존성 파일만 변경됨 (소스 파일이 없는 경우) = build
 	if hasDependencyFile && sourceFileCount == 0 && !hasRegularConfig {
-		typeScore["build"] += 10
+		typeScore["build"] += 15
 		typeScore["chore"] -= 5
 	}
 
-	// 일반 설정 파일만 변경됨 = chore
+	// 일반 설정 파일만 변경됨 (소스 파일이 없는 경우) = chore
 	if hasRegularConfig && sourceFileCount == 0 && !hasDependencyFile {
-		typeScore["chore"] += 10
+		typeScore["chore"] += 15
 		typeScore["build"] -= 5
 	}
 
-	// 의존성 파일이 있더라도 새 소스 파일이 많으면 build 점수 감소
-	// (새 기능 추가에 수반된 의존성 업데이트인 경우)
-	if hasDependencyFile && newSourceFileCount >= 3 {
-		typeScore["build"] -= 10
-		typeScore["feat"] += 10
+	// 소스 파일이 있는 경우: 의존성/설정 변경은 무시하고 소스 파일 유형 우선
+	// 새 소스 파일이 있으면 무조건 feat
+	if newSourceFileCount > 0 {
+		typeScore["feat"] += 50
+		typeScore["build"] -= 20
+		typeScore["chore"] -= 20
 	}
 
 	// 최대 점수 타입 선택
@@ -371,107 +380,101 @@ func InferCommitType(files []FileChange) string {
 	return bestType
 }
 
+// init는 패키지 초기화 시 의존성 파일 Map을 생성합니다.
+func init() {
+	depFileOnce.Do(func() {
+		dependencyFiles = make(map[string]bool)
+
+		// Node.js/JavaScript
+		dependencyFiles["package.json"] = true
+		dependencyFiles["package-lock.json"] = true
+		dependencyFiles["yarn.lock"] = true
+		dependencyFiles["pnpm-lock.yaml"] = true
+
+		// Go
+		dependencyFiles["go.mod"] = true
+		dependencyFiles["go.sum"] = true
+
+		// Python
+		dependencyFiles["requirements.txt"] = true
+		dependencyFiles["Pipfile"] = true
+		dependencyFiles["poetry.lock"] = true
+		dependencyFiles["pyproject.toml"] = true
+
+		// Java/Maven/Gradle
+		dependencyFiles["pom.xml"] = true
+		dependencyFiles["build.gradle"] = true
+		dependencyFiles["build.gradle.kts"] = true
+		dependencyFiles["gradle.properties"] = true
+
+		// Ruby
+		dependencyFiles["Gemfile"] = true
+		dependencyFiles["Gemfile.lock"] = true
+
+		// PHP
+		dependencyFiles["composer.json"] = true
+		dependencyFiles["composer.lock"] = true
+
+		// Rust
+		dependencyFiles["Cargo.toml"] = true
+		dependencyFiles["Cargo.lock"] = true
+
+		// .NET
+		dependencyFiles["packages.config"] = true
+		dependencyFiles["NuGet.config"] = true
+		dependencyFiles["nuget.config"] = true
+
+		// Swift/CocoaPods
+		dependencyFiles["Podfile"] = true
+		dependencyFiles["Podfile.lock"] = true
+		dependencyFiles["Package.swift"] = true
+
+		// Dart/Flutter
+		dependencyFiles["pubspec.yaml"] = true
+		dependencyFiles["pubspec.lock"] = true
+
+		// CMake
+		dependencyFiles["CMakeLists.txt"] = true
+		dependencyFiles["CMakeCache.txt"] = true
+
+		// Conan
+		dependencyFiles["conanfile.txt"] = true
+		dependencyFiles["conanfile.py"] = true
+
+		// Vcpkg
+		dependencyFiles["vcpkg.json"] = true
+
+		// Bazel
+		dependencyFiles["WORKSPACE"] = true
+		dependencyFiles["BUILD"] = true
+		dependencyFiles["BUILD.bazel"] = true
+
+		// Buck
+		dependencyFiles["BUCK"] = true
+
+		// Leiningen (Clojure)
+		dependencyFiles["project.clj"] = true
+
+		// Mix (Elixir)
+		dependencyFiles["mix.exs"] = true
+
+		// Rebar3 (Erlang)
+		dependencyFiles["rebar.config"] = true
+	})
+}
+
 // isDependencyFile은 파일이 의존성 관련 파일인지 확인합니다.
+// O(1) 성능: Map 기반 룩업 사용
 func isDependencyFile(path string) bool {
 	base := filepath.Base(path)
 
-	// Node.js/JavaScript
-	if base == "package.json" || base == "package-lock.json" || base == "yarn.lock" || base == "pnpm-lock.yaml" {
+	// Map 룩업 (O(1))
+	if dependencyFiles[base] {
 		return true
 	}
 
-	// Go
-	if base == "go.mod" || base == "go.sum" {
-		return true
-	}
-
-	// Python
-	if base == "requirements.txt" || base == "Pipfile" || base == "poetry.lock" || base == "pyproject.toml" {
-		return true
-	}
-
-	// Java/Maven/Gradle
-	if base == "pom.xml" || base == "build.gradle" || base == "build.gradle.kts" || base == "gradle.properties" {
-		return true
-	}
-
-	// Ruby
-	if base == "Gemfile" || base == "Gemfile.lock" {
-		return true
-	}
-
-	// PHP
-	if base == "composer.json" || base == "composer.lock" {
-		return true
-	}
-
-	// Rust
-	if base == "Cargo.toml" || base == "Cargo.lock" {
-		return true
-	}
-
-	// .NET
-	if strings.HasSuffix(base, ".csproj") || base == "packages.config" {
-		return true
-	}
-
-	// Swift/CocoaPods
-	if base == "Podfile" || base == "Podfile.lock" || base == "Package.swift" {
-		return true
-	}
-
-	// Dart/Flutter
-	if base == "pubspec.yaml" || base == "pubspec.lock" {
-		return true
-	}
-
-	// Composer (PHP)
-	if base == "composer.json" || base == "composer.lock" {
-		return true
-	}
-
-	// CMake
-	if base == "CMakeLists.txt" || base == "CMakeCache.txt" {
-		return true
-	}
-
-	// Conan
-	if base == "conanfile.txt" || base == "conanfile.py" {
-		return true
-	}
-
-	// Vcpkg
-	if base == "vcpkg.json" {
-		return true
-	}
-
-	// Bazel
-	if base == "WORKSPACE" || base == "BUILD" || base == "BUILD.bazel" {
-		return true
-	}
-
-	// Buck
-	if base == "BUCK" {
-		return true
-	}
-
-	// Leiningen (Clojure)
-	if base == "project.clj" {
-		return true
-	}
-
-	// Mix (Elixir)
-	if base == "mix.exs" {
-		return true
-	}
-
-	// Rebar3 (Erlang)
-	if base == "rebar.config" {
-		return true
-	}
-
-	// NuGet.config
-	if base == "NuGet.config" || base == "nuget.config" {
+	// .NET 프로젝트 파일 확장자 체크
+	if strings.HasSuffix(base, ".csproj") || strings.HasSuffix(base, ".vbproj") || strings.HasSuffix(base, ".fsproj") {
 		return true
 	}
 
@@ -484,13 +487,62 @@ func InferScopes(files []FileChange) []string {
 		return []string{}
 	}
 
-	// 1. 최상위 디렉토리별 소스 파일 수 집계
-	topLevelDirs := make(map[string]int) // 최상위 디렉토리별 소스 파일 수
-	for _, file := range files {
-		if file.FileType != FileTypeSource {
-			continue
-		}
+	// 1. 파일 유형별 분류
+	var sourceFiles []FileChange
+	var configFiles []FileChange
+	var dependencyFiles []FileChange
+	var docFiles []FileChange
+	var testFiles []FileChange
 
+	for _, file := range files {
+		switch file.FileType {
+		case FileTypeSource:
+			sourceFiles = append(sourceFiles, file)
+		case FileTypeConfig:
+			if isDependencyFile(file.Path) {
+				dependencyFiles = append(dependencyFiles, file)
+			} else {
+				configFiles = append(configFiles, file)
+			}
+		case FileTypeDoc:
+			docFiles = append(docFiles, file)
+		case FileTypeTest:
+			testFiles = append(testFiles, file)
+		}
+	}
+
+	// 2. 소스 파일이 있는 경우: 소스 파일 기반으로 scope 결정
+	if len(sourceFiles) > 0 {
+		return inferScopeFromSourceFiles(sourceFiles)
+	}
+
+	// 3. 소스 파일이 없는 경우: 다른 파일 유형으로 scope 결정
+	if len(dependencyFiles) > 0 {
+		// 의존성 파일만 있는 경우
+		return inferScopeFromConfigFiles(append(dependencyFiles, configFiles...))
+	}
+
+	if len(configFiles) > 0 {
+		// 일반 설정 파일만 있는 경우
+		return inferScopeFromConfigFiles(configFiles)
+	}
+
+	if len(docFiles) > 0 {
+		return []string{"docs"}
+	}
+
+	if len(testFiles) > 0 {
+		return []string{"test"}
+	}
+
+	return []string{}
+}
+
+// inferScopeFromSourceFiles는 소스 파일에서 scope를 추론합니다.
+func inferScopeFromSourceFiles(sourceFiles []FileChange) []string {
+	// 최상위 디렉토리별 소스 파일 수 집계
+	topLevelDirs := make(map[string]int)
+	for _, file := range sourceFiles {
 		path := file.Path
 		parts := strings.Split(filepath.Clean(path), string(filepath.Separator))
 		if len(parts) > 0 {
@@ -499,15 +551,10 @@ func InferScopes(files []FileChange) []string {
 		}
 	}
 
-	// 소스 파일이 하나도 없으면 빈 스코프 반환
-	if len(topLevelDirs) == 0 {
-		return []string{}
-	}
+	// 최대 공통 디렉토리 찾기
+	commonPrefix := findCommonPrefix(sourceFiles)
 
-	// 2. 최대 공통 디렉토리 찾기
-	commonPrefix := findCommonPrefix(files)
-
-	// 3. 주요 scope 결정
+	// 주요 scope 결정
 	var scopes []string
 
 	if commonPrefix != "" {
@@ -532,6 +579,47 @@ func InferScopes(files []FileChange) []string {
 	}
 
 	return scopes
+}
+
+// inferScopeFromConfigFiles는 설정 파일에서 scope를 추론합니다.
+func inferScopeFromConfigFiles(configFiles []FileChange) []string {
+	if len(configFiles) == 0 {
+		return []string{}
+	}
+
+	// 모든 파일이 같은 최상위 디렉토리에 있는지 확인
+	topLevelDirs := make(map[string]bool)
+	for _, file := range configFiles {
+		path := file.Path
+		parts := strings.Split(filepath.Clean(path), string(filepath.Separator))
+		if len(parts) > 0 {
+			topLevelDirs[parts[0]] = true
+		}
+	}
+
+	// 하나의 최상위 디렉토리만 있으면 그걸 사용
+	if len(topLevelDirs) == 1 {
+		for dir := range topLevelDirs {
+			return []string{simplifyScopeName(dir)}
+		}
+	}
+
+	// 여러 디렉토리에 파일이 있으면:
+	// - 의존성 파일이 포함되어 있는지 확인
+	hasDependency := false
+	for _, file := range configFiles {
+		if isDependencyFile(file.Path) {
+			hasDependency = true
+			break
+		}
+	}
+
+	if hasDependency {
+		return []string{"config"}
+	}
+
+	// 일반 설정 파일만 있고 여러 디렉토리에 있으면 "config" 사용
+	return []string{"config"}
 }
 
 // findCommonPrefix는 모든 파일의 공통 경로 접두사를 찾습니다.

@@ -8,12 +8,42 @@ All notable changes to this project will be documented in this file.
 - `-v` 플래그로 버전 정보 출력 기능
 - 빌드 타임 버전 주입 시스템 (ldflags 사용)
 
+### Performance
+- 병렬 처리 임계값 조절: 5개 → 3개 파일로 낮춰 중간 규모 커밋에서도 병렬 처리 활용
+- 의존성 파일 감지 최적화: O(n) → O(1) Map 기반 룩업으로 개선
+- 파일 타입 분류 최적화: O(n) → O(1) Map 기반 룩업으로 개선
+- 대규모 커밋(100+ 파일)에서 최악의 경우 40배 이상 성능 향상
+
+### Fixed
+- **커밋 타입 분류 정확도**: 기능 추가를 `build`로 잘못 분류하는 문제 해결
+  - 새 소스 파일이 있으면 무조건 `feat`로 분류하도록 가중치 조정
+  - 의존성/설정 변경 점수 낮추고 소스 파일 우선하도록 로직 개선
+  - 새 소스 파일 임계값 3개 → 2개로 낮춤
+  - 새 디렉토리 가중치 증가 (+20 → +30점)
+  - **문서 파일 점수 낮춤**: 문서 업데이트가 소스 코드 변경보다 우선하는 문제 해결 (8점 → 3점)
+  - **리팩토링 점수 증가**: 기존 소스 파일 수정의 중요성 반영 (5점 → 10점)
+
+- **Scope 과도한 파일 나열**: 설정 파일만 있을 때 모든 파일 이름을 나열하는 문제 해결
+  - 소스 파일이 있으면 소스 파일 기반으로만 scope 계산
+  - 설정 파일만 있는 경우:
+    - 하나의 디렉토리에 있으면 그 디렉토리 사용
+    - 여러 디렉토리에 있으면 `"config"` 사용
+
 ### Technical Details
 - `internal/version/version.go`: 버전 변수 정의 (기본값 "dev")
 - `cmd/root.go`: version 플래그 및 출력 로직 추가
 - `build.sh`: 빌드 시점에 버전 주입 (`-X git-ai-commit/internal/version.Version=${VERSION}`)
+- `internal/git/diff.go`: 
+  - 의존성 파일 Map 초기화 (init 함수)
+  - `isDependencyFile()`: O(1) Map 룩업으로 리팩토링
+  - `InferCommitType()`: 커밋 타입 추론 로직 개선
+  - `InferScopes()`: Scope 추론 로직 개선 (파일 유형별 분리 처리)
+- `internal/worker/pool.go`:
+  - 파일 타입 분류용 Map 초기화 (init 함수)
+  - `classifyFileType()`: O(1) Map 룩업으로 리팩토링
+  - 병렬 처리 임계값 5 → 3으로 조절
 
-상세 내용은 [docs/refactoring/v1.5.0-version-flag-support.md](docs/refactoring/v1.5.0-version-flag-support.md) 참고
+상세 내용은 [docs/refactoring/v1.5.0-versioning-and-build-system.md](docs/refactoring/v1.5.0-versioning-and-build-system.md) 참고
 
 ## [1.4.0] - 2026-02-10
 

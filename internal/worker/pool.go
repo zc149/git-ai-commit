@@ -7,6 +7,14 @@ import (
 	"sync"
 )
 
+// 파일 타입 분류용 Map (패키지 초기화 시 한 번만 생성)
+var (
+	testFileExts   map[string]bool
+	docFileExts    map[string]bool
+	configFileExts map[string]bool
+	classifyOnce   sync.Once
+)
+
 // FileDiff는 단일 파일의 diff 정보를 담습니다.
 type FileDiff struct {
 	Header string // diff 헤더 라인
@@ -143,7 +151,7 @@ func ParseDiffParallel(diff string, workers int) ([]ParsedFile, error) {
 	fileDiffs := splitFileDiffs(diff)
 
 	// 파일 수가 적으면 nil 반환 (호출자가 순차 처리)
-	if len(fileDiffs) <= 5 {
+	if len(fileDiffs) <= 3 {
 		return nil, nil
 	}
 
@@ -211,49 +219,67 @@ func splitFileDiffs(diff string) []FileDiff {
 	return fileDiffs
 }
 
+// init는 패키지 초기화 시 파일 타입 분류용 Map을 생성합니다.
+func init() {
+	classifyOnce.Do(func() {
+		// 테스트 파일 확장자
+		testFileExts = make(map[string]bool)
+		testFileExts["_test.go"] = true
+		testFileExts[".spec.js"] = true
+		testFileExts[".test.ts"] = true
+		testFileExts[".test.jsx"] = true
+		testFileExts[".spec.tsx"] = true
+
+		// 문서 파일 확장자 및 파일명
+		docFileExts = make(map[string]bool)
+		docFileExts["README.md"] = true
+		docFileExts["CHANGELOG.md"] = true
+		docFileExts["CONTRIBUTING.md"] = true
+		docFileExts[".md"] = true
+		docFileExts[".txt"] = true
+		docFileExts[".rst"] = true
+
+		// 설정 파일 확장자 및 파일명
+		configFileExts = make(map[string]bool)
+		configFileExts["package.json"] = true
+		configFileExts["package-lock.json"] = true
+		configFileExts["go.mod"] = true
+		configFileExts["go.sum"] = true
+		configFileExts["Cargo.toml"] = true
+		configFileExts["pom.xml"] = true
+		configFileExts["build.gradle"] = true
+		configFileExts["requirements.txt"] = true
+		configFileExts["Makefile"] = true
+		configFileExts["Dockerfile"] = true
+		configFileExts[".yml"] = true
+		configFileExts[".yaml"] = true
+		configFileExts[".toml"] = true
+		configFileExts[".json"] = true
+		configFileExts[".xml"] = true
+		configFileExts[".ini"] = true
+		configFileExts[".conf"] = true
+		configFileExts[".cfg"] = true
+	})
+}
+
 // classifyFileType은 파일 경로에서 파일 타입을 결정합니다.
+// O(1) 성능: Map 기반 룩업 사용
 func classifyFileType(path string) int {
 	base := filepath.Base(path)
 	ext := filepath.Ext(path)
 
-	// 테스트 파일
-	if strings.HasSuffix(base, "_test.go") ||
-		strings.HasSuffix(base, ".spec.js") ||
-		strings.HasSuffix(base, ".test.ts") ||
-		strings.HasSuffix(base, ".test.jsx") ||
-		strings.HasSuffix(base, ".spec.tsx") {
+	// 테스트 파일 Map 룩업
+	if testFileExts[base] || testFileExts[ext] {
 		return 1 // FileTypeTest
 	}
 
-	// 문서 파일
-	if base == "README.md" ||
-		base == "CHANGELOG.md" ||
-		base == "CONTRIBUTING.md" ||
-		ext == ".md" ||
-		ext == ".txt" ||
-		ext == ".rst" {
+	// 문서 파일 Map 룩업
+	if docFileExts[base] || docFileExts[ext] {
 		return 2 // FileTypeDoc
 	}
 
-	// 설정 파일
-	if base == "package.json" ||
-		base == "package-lock.json" ||
-		base == "go.mod" ||
-		base == "go.sum" ||
-		base == "Cargo.toml" ||
-		base == "pom.xml" ||
-		base == "build.gradle" ||
-		base == "requirements.txt" ||
-		base == "Makefile" ||
-		base == "Dockerfile" ||
-		ext == ".yml" ||
-		ext == ".yaml" ||
-		ext == ".toml" ||
-		ext == ".json" ||
-		ext == ".xml" ||
-		ext == ".ini" ||
-		ext == ".conf" ||
-		ext == ".cfg" {
+	// 설정 파일 Map 룩업
+	if configFileExts[base] || configFileExts[ext] {
 		return 3 // FileTypeConfig
 	}
 
