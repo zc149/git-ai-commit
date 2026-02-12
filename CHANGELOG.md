@@ -29,6 +29,20 @@ All notable changes to this project will be documented in this file.
     - 하나의 디렉토리에 있으면 그 디렉토리 사용
     - 여러 디렉토리에 있으면 `"config"` 사용
 
+- **Multi-line 커밋 메시지 출력 실패**: `-detail high` 옵션 사용 시 한 줄만 출력되는 문제 해결
+  - **파싱 로직 수정** (`internal/llm/utils.go`):
+    - 빈 줄을 만나면 즉시 중지하는 버그 수정
+    - 빈 줄 1개는 허용 (multi-line 형식의 필수 요소)
+    - 연속 빈 줄 2개 이상만 메시지 끝으로 간주
+    - 들여쓰기 보존 (원본 라인 그대로 사용)
+  - **LLM 지시 강화** (`internal/llm/groq.go`):
+    - System message 추가로 형식 준수 의무화
+    - Temperature 0.7 → 0.5로 낮춰 출력 일관성 향상
+  - **프롬프트 강화** (`internal/core/prompt.go`):
+    - `detail=high` 프롬프트 대폭 강화
+    - 명확한 형식 예시와 5가지 규칙 제시
+    - Bullet point 최소 개수 및 들여쓰기 명시
+
 ### Technical Details
 - `internal/version/version.go`: 버전 변수 정의 (기본값 "dev")
 - `cmd/root.go`: version 플래그 및 출력 로직 추가
@@ -42,6 +56,14 @@ All notable changes to this project will be documented in this file.
   - 파일 타입 분류용 Map 초기화 (init 함수)
   - `classifyFileType()`: O(1) Map 룩업으로 리팩토링
   - 병렬 처리 임계값 5 → 3으로 조절
+- `internal/llm/utils.go`:
+  - `parseCommitMessages()`: 빈 줄 처리 로직 개선 (연속 빈 줄 2개까지 허용)
+  - 들여쓰기 보존 로직 추가
+- `internal/llm/groq.go`:
+  - System message 추가 (형식 준수 강제)
+  - Temperature 0.7 → 0.5로 조정
+- `internal/core/prompt.go`:
+  - `detail=high` 프롬프트 강화 (형식 예시 및 명확한 규칙)
 
 상세 내용은 [docs/refactoring/v1.5.0-versioning-and-build-system.md](docs/refactoring/v1.5.0-versioning-and-build-system.md) 참고
 

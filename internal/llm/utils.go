@@ -17,17 +17,30 @@ func parseCommitMessages(text string) []string {
 		if isNumberedFormat(line) {
 			msg := removeNumberPrefix(line)
 
-			// 다음 줄들을 계속 수집 (다음 번호나 빈 줄이 나올 때까지)
+			// 다음 줄들을 계속 수집 (다음 번호가 나올 때까지)
 			i++
-			for i < len(lines) {
-				nextLine := trimWhitespace(lines[i])
+			consecutiveEmptyLines := 0
 
-				// 빈 줄이거나 다음 번호가 나오면 중지
-				if nextLine == "" || isNumberedFormat(nextLine) {
+			for i < len(lines) {
+				nextLine := lines[i] // trimWhitespace 하지 않고 원본 유지
+				trimmedNext := trimWhitespace(nextLine)
+
+				// 다음 번호 형식이 나오면 중지
+				if isNumberedFormat(trimmedNext) {
 					break
 				}
 
-				// 들여쓰기된 줄이나 연속된 내용을 추가
+				// 연속된 빈 줄이 2개 이상이면 메시지의 끝으로 간주
+				if trimmedNext == "" {
+					consecutiveEmptyLines++
+					if consecutiveEmptyLines >= 2 {
+						break
+					}
+				} else {
+					consecutiveEmptyLines = 0
+				}
+
+				// 줄 추가 (빈 줄 포함, 들여쓰기 보존)
 				if msg != "" {
 					msg += "\n" + nextLine
 				} else {

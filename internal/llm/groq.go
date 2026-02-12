@@ -32,17 +32,35 @@ func NewGroqProvider(apiKey string) (*GroqProvider, error) {
 func (g *GroqProvider) Generate(prompt string) ([]string, error) {
 	ctx := context.Background()
 
+	// System message로 강력한 지시 제공
+	systemMessage := `You are a commit message generator that strictly follows instructions.
+
+CRITICAL RULES:
+1. When asked for multi-line format, you MUST provide multi-line commit messages
+2. Multi-line format structure:
+   - Title line (type(scope): summary)
+   - Blank line
+   - Detailed bullet points with proper indentation
+3. Follow the exact format shown in examples
+4. Preserve indentation and blank lines exactly as instructed
+
+Always follow the detail level instructions in the user prompt precisely.`
+
 	resp, err := g.client.CreateChatCompletion(
 		ctx,
 		openai.ChatCompletionRequest{
 			Model: g.model,
 			Messages: []openai.ChatCompletionMessage{
 				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: systemMessage,
+				},
+				{
 					Role:    openai.ChatMessageRoleUser,
 					Content: prompt,
 				},
 			},
-			Temperature: 0.7,
+			Temperature: 0.5, // 낮춰서 더 일관된 응답 유도 (0.7 → 0.5)
 			MaxTokens:   4096,
 		},
 	)
