@@ -1,40 +1,45 @@
-name: Gemini AI Code Reviewer
+name: Gemini PR Review
 
 on:
   pull_request:
     branches:
       - main
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize]
 
-permissions: write-all
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  GEMINI_MODEL: gemini-2.5-flash
 
 jobs:
-  gemini-code-review:
+  review:
     runs-on: ubuntu-latest
 
     steps:
-      - name: PR Info
-        run: |
-          echo "PR Number: ${{ github.event.pull_request.number }}"
-          echo "Repository: ${{ github.repository }}"
+      - uses: actions/checkout@v4
 
-      - name: Checkout Repo
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Get PR Details
-        id: pr
+      - name: Get PR Diff
         run: |
-          PR_JSON=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }})
-          echo "head_sha=$(echo $PR_JSON | jq -r .head.sha)" >> $GITHUB_OUTPUT
-          echo "base_sha=$(echo $PR_JSON | jq -r .base.sha)" >> $GITHUB_OUTPUT
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          git diff origin/${{ github.event.pull_request.base.ref }} > pr.diff
+
+      - name: Gemini Review
+        run: |
+          RESPONSE=$(curl -s https://generativelanguage.googleapis.com/v1beta/models/${{ env.GEMINI_MODEL }}:generateContent \
+            -H "Content-Type: application/json" \
+            -H "x-goog-api-key: ${{ secrets.GEMINI_API_KEY }}" \
+            -d "{
+              \"contents\": [{
+                \"parts\": [{
+                  \"text\": \"Review this pull request diff and suggest improvements:\n$(cat pr.diff)\"
+                }]
+              }]
+            }")
+
+          COMMENT=$(echo $RESPONSE | jq -r '.candidates[0].content.parts[0].text')
+
+          gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: truongnh1992/gemini-ai-code-reviewer@main
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: gemini-2.5-pro
-          EXCLUDE: "*.md,*.txt,package-lock.json,*.yml,*.yaml"
