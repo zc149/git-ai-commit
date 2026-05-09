@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION=${VERSION:-"1.4.0"}
+VERSION=${VERSION:-"1.5.0"}
 BUILD_DIR="dist"
 BINARY_NAME="git-ai-commit"
 

@@ -2,11 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.5.0] - Unreleased
+## [1.5.0] - 2026-05-09
 
 ### Added
 - `-v` 플래그로 버전 정보 출력 기능
 - 빌드 타임 버전 주입 시스템 (ldflags 사용)
+- 구조화된 diff 분석 결과(`DiffAnalysis`) 추가
+- commit type별 점수와 근거를 계산하는 추천 엔진 추가
+- 파일별 추가/삭제 라인 수 분석 추가
+- README를 현재 기능과 사용 흐름 기준으로 재작성
 
 ### Performance
 - 병렬 처리 임계값 조절: 5개 → 3개 파일로 낮춰 중간 규모 커밋에서도 병렬 처리 활용
@@ -15,6 +19,11 @@ All notable changes to this project will be documented in this file.
 - 대규모 커밋(100+ 파일)에서 최악의 경우 40배 이상 성능 향상
 
 ### Fixed
+- **버전 관리 불일치**: 빌드 스크립트 기본 버전을 `1.5.0`으로 갱신하고 기본 버전 출력도 최신 릴리즈와 일치하도록 수정
+- **diff 파서 안정성**: 긴 diff 라인, 공백 포함 파일명, 병렬 파서의 파일 순서 보장 문제 해결
+- **테스트 파일 분류 개선**: `.test.js`, `.spec.ts`, `.test.tsx`, `__tests__/`, `tests/`, `testdata/` 경로 인식 추가
+- **커밋 타입 오탐 방지**: `prefix`, `suffix` 같은 단어가 `fix` 신호로 잘못 잡히지 않도록 정규식 기반 신호 감지로 개선
+- **영어 프롬프트 문구 수정**: 영어 프롬프트에 남아 있던 한국어 요구사항을 영어로 수정
 - **커밋 타입 분류 정확도**: 기능 추가를 `build`로 잘못 분류하는 문제 해결
   - 새 소스 파일이 있으면 무조건 `feat`로 분류하도록 가중치 조정
   - 의존성/설정 변경 점수 낮추고 소스 파일 우선하도록 로직 개선
