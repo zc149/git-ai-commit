@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"git-ai-commit/internal/cache"
@@ -87,7 +88,7 @@ func (r *RootCommand) Run() error {
 	}
 
 	if model == "" {
-		return fmt.Errorf(r.getMessage("error_no_api_key", lang))
+		return errors.New(r.getMessage("error_no_api_key", lang))
 	}
 
 	fmt.Printf("🤖 %s: %s\n", r.getMessage("label_using_model", lang), model)
@@ -346,5 +347,3 @@ func getEnvWithDefault(key, defaultValue string) string {
 	}
 	return value
 }
-
-// 테스트용 코드
