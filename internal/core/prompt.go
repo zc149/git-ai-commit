@@ -97,10 +97,11 @@ func GeneratePrompt(diff *git.DiffResult, detail string, lang string) string {
 	// 요구사항
 	if lang == "ko" {
 		builder.WriteString("요구사항:\n")
+		builder.WriteString("- 간결할 것\n")
 	} else {
 		builder.WriteString("Requirements:\n")
+		builder.WriteString("- Be concise\n")
 	}
-	builder.WriteString("- 간결할 것\n")
 	if lang == "ko" {
 		builder.WriteString("- Conventional Commit 형식 (type(scope): message)\n")
 	} else {

@@ -8,7 +8,6 @@ import (
 
 // 파일 타입 분류용 Map (패키지 초기화 시 한 번만 생성)
 var (
-	testFileExts   map[string]bool
 	docFileExts    map[string]bool
 	configFileExts map[string]bool
 	classifyOnce   sync.Once
@@ -287,14 +286,6 @@ func removeFileStatusLines(body string) string {
 // init는 패키지 초기화 시 파일 타입 분류용 Map을 생성합니다.
 func init() {
 	classifyOnce.Do(func() {
-		// 테스트 파일 확장자
-		testFileExts = make(map[string]bool)
-		testFileExts["_test.go"] = true
-		testFileExts[".spec.js"] = true
-		testFileExts[".test.ts"] = true
-		testFileExts[".test.jsx"] = true
-		testFileExts[".spec.tsx"] = true
-
 		// 문서 파일 확장자 및 파일명
 		docFileExts = make(map[string]bool)
 		docFileExts["README.md"] = true
@@ -330,11 +321,11 @@ func init() {
 // classifyFileType은 파일 경로에서 파일 타입을 결정합니다.
 // O(1) 성능: Map 기반 룩업 사용
 func classifyFileType(path string) int {
-	base := filepath.Base(path)
-	ext := filepath.Ext(path)
+	cleanPath := filepath.ToSlash(filepath.Clean(path))
+	base := filepath.Base(cleanPath)
+	ext := filepath.Ext(cleanPath)
 
-	// 테스트 파일 Map 룩업
-	if testFileExts[base] || testFileExts[ext] {
+	if isTestPath(cleanPath, base) {
 		return 1 // FileTypeTest
 	}
 
@@ -350,6 +341,34 @@ func classifyFileType(path string) int {
 
 	// 기본적으로 소스 파일
 	return 0 // FileTypeSource
+}
+
+func isTestPath(cleanPath string, base string) bool {
+	if strings.HasSuffix(base, "_test.go") ||
+		strings.HasSuffix(base, ".test.js") ||
+		strings.HasSuffix(base, ".spec.js") ||
+		strings.HasSuffix(base, ".test.ts") ||
+		strings.HasSuffix(base, ".spec.ts") ||
+		strings.HasSuffix(base, ".test.jsx") ||
+		strings.HasSuffix(base, ".spec.jsx") ||
+		strings.HasSuffix(base, ".test.tsx") ||
+		strings.HasSuffix(base, ".spec.tsx") {
+		return true
+	}
+
+	return hasPathSegment(cleanPath, "__tests__") ||
+		hasPathSegment(cleanPath, "test") ||
+		hasPathSegment(cleanPath, "tests") ||
+		hasPathSegment(cleanPath, "testdata")
+}
+
+func hasPathSegment(path string, segment string) bool {
+	for _, part := range strings.Split(path, "/") {
+		if part == segment {
+			return true
+		}
+	}
+	return false
 }
 
 // GetOptimalWorkerCount는 시스템에 최적화된 worker 수를 반환합니다.

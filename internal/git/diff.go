@@ -258,15 +258,12 @@ func normalizeDiffPath(path string) string {
 
 // ClassifyFileType은 파일 경로에서 파일 타입을 결정합니다.
 func ClassifyFileType(path string) FileType {
-	base := filepath.Base(path)
-	ext := filepath.Ext(path)
+	cleanPath := filepath.ToSlash(filepath.Clean(path))
+	base := filepath.Base(cleanPath)
+	ext := filepath.Ext(cleanPath)
 
 	// 테스트 파일
-	if strings.HasSuffix(base, "_test.go") ||
-		strings.HasSuffix(base, ".spec.js") ||
-		strings.HasSuffix(base, ".test.ts") ||
-		strings.HasSuffix(base, ".test.jsx") ||
-		strings.HasSuffix(base, ".spec.tsx") {
+	if isTestPath(cleanPath, base) {
 		return FileTypeTest
 	}
 
@@ -304,6 +301,34 @@ func ClassifyFileType(path string) FileType {
 
 	// 기본적으로 소스 파일
 	return FileTypeSource
+}
+
+func isTestPath(cleanPath string, base string) bool {
+	if strings.HasSuffix(base, "_test.go") ||
+		strings.HasSuffix(base, ".test.js") ||
+		strings.HasSuffix(base, ".spec.js") ||
+		strings.HasSuffix(base, ".test.ts") ||
+		strings.HasSuffix(base, ".spec.ts") ||
+		strings.HasSuffix(base, ".test.jsx") ||
+		strings.HasSuffix(base, ".spec.jsx") ||
+		strings.HasSuffix(base, ".test.tsx") ||
+		strings.HasSuffix(base, ".spec.tsx") {
+		return true
+	}
+
+	return hasPathSegment(cleanPath, "__tests__") ||
+		hasPathSegment(cleanPath, "test") ||
+		hasPathSegment(cleanPath, "tests") ||
+		hasPathSegment(cleanPath, "testdata")
+}
+
+func hasPathSegment(path string, segment string) bool {
+	for _, part := range strings.Split(path, "/") {
+		if part == segment {
+			return true
+		}
+	}
+	return false
 }
 
 // InferCommitType은 파일 변화를 기반으로 커밋 타입을 추론합니다.

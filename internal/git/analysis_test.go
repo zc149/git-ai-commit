@@ -33,6 +33,13 @@ func TestAnalyzeFilesRecommendedType(t *testing.T) {
 			want: "refactor",
 		},
 		{
+			name: "prefix suffix words do not trigger fix signal",
+			files: []FileChange{
+				sourceChange("internal/text/format.go", false, false, "-prefix := oldPrefix\n+prefix := newPrefix\n-suffix := oldSuffix\n+suffix := newSuffix"),
+			},
+			want: "refactor",
+		},
+		{
 			name: "docs only is docs",
 			files: []FileChange{
 				fileChange("README.md", FileTypeDoc, false, false, "+## Usage"),
@@ -128,6 +135,26 @@ func TestInferScopes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := InferScopes(tt.files); !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("InferScopes() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClassifyFileTypeRecognizesTestPaths(t *testing.T) {
+	tests := []string{
+		"internal/auth/service_test.go",
+		"src/auth/login.test.js",
+		"src/auth/login.spec.ts",
+		"src/auth/Login.test.tsx",
+		"src/__tests__/login.js",
+		"tests/integration/auth.go",
+		"internal/git/testdata/diff.txt",
+	}
+
+	for _, path := range tests {
+		t.Run(path, func(t *testing.T) {
+			if got := ClassifyFileType(path); got != FileTypeTest {
+				t.Fatalf("ClassifyFileType(%q) = %s, want test", path, got)
 			}
 		})
 	}

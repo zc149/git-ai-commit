@@ -15,15 +15,20 @@ var publicSymbolPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`^\+\s*export\s+(default\s+)?(async\s+)?(function|class|const|let|var|interface|type)\b`),
 }
 
-var fixKeywords = []string{
-	"fix", "bug", "error", "err !=", "nil", "null", "panic", "exception",
-	"timeout", "validate", "validation", "guard", "fallback", "regression",
-	"fail", "failed", "not found", "missing", "invalid",
+var fixSignalPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)\bfix(e[ds])?\b`),
+	regexp.MustCompile(`(?i)\bbug(s)?\b`),
+	regexp.MustCompile(`(?i)\berr\s*!=\s*nil\b`),
+	regexp.MustCompile(`(?i)(==|!=)\s*(nil|null)\b`),
+	regexp.MustCompile(`(?i)\b(error|errors|failure|failed|panic|exception|timeout)\b`),
+	regexp.MustCompile(`(?i)\b(validate|validation|guard|fallback|regression|missing|invalid)\b`),
+	regexp.MustCompile(`(?i)\bnot\s+found\b`),
 }
 
-var featureKeywords = []string{
-	"new ", "add ", "create ", "implement ", "support ", "enable ",
-	"endpoint", "route", "handler", "command", "feature",
+var featureSignalPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)\b(add|adds|added|create|creates|created)\b`),
+	regexp.MustCompile(`(?i)\b(implement|implements|implemented|support|supports|enable|enables|enabled)\b`),
+	regexp.MustCompile(`(?i)\b(endpoint|route|handler|command|feature)\b`),
 }
 
 // DiffAnalysis는 파일 diff에서 추출한 구조화된 분석 결과입니다.
@@ -196,18 +201,18 @@ func scoreByContentSignals(files []FileChange, analysis *DiffAnalysis, scores ma
 		}
 
 		added := addedDiffLines(file.Changes)
-		changedText := strings.ToLower(strings.Join(changedDiffLines(file.Changes), "\n"))
-		addedText := strings.ToLower(strings.Join(added, "\n"))
+		changedText := strings.Join(changedDiffLines(file.Changes), "\n")
+		addedText := strings.Join(added, "\n")
 
 		if len(added) > 0 && hasPublicSymbol(added) {
 			addScore(scores, "feat", 35, "public source symbol added")
 			analysis.Signals = append(analysis.Signals, "public API/symbol added")
 		}
-		if containsAny(changedText, fixKeywords) {
+		if matchesAnyPattern(changedText, fixSignalPatterns) {
 			addScore(scores, "fix", 55, "bug or error-handling signal in source diff")
 			analysis.Signals = append(analysis.Signals, "bug/error-handling signal")
 		}
-		if file.IsNew && containsAny(addedText, featureKeywords) {
+		if file.IsNew && matchesAnyPattern(addedText, featureSignalPatterns) {
 			addScore(scores, "feat", 20, "feature-oriented source additions")
 			analysis.Signals = append(analysis.Signals, "feature-oriented additions")
 		}
@@ -332,9 +337,9 @@ func hasPublicSymbol(lines []string) bool {
 	return false
 }
 
-func containsAny(text string, keywords []string) bool {
-	for _, keyword := range keywords {
-		if strings.Contains(text, keyword) {
+func matchesAnyPattern(text string, patterns []*regexp.Regexp) bool {
+	for _, pattern := range patterns {
+		if pattern.MatchString(text) {
 			return true
 		}
 	}

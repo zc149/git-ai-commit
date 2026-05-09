@@ -62,6 +62,26 @@ func TestSplitFileDiffsRetainsLongLines(t *testing.T) {
 	}
 }
 
+func TestClassifyFileTypeRecognizesTestPaths(t *testing.T) {
+	tests := []string{
+		"internal/auth/service_test.go",
+		"src/auth/login.test.js",
+		"src/auth/login.spec.ts",
+		"src/auth/Login.test.tsx",
+		"src/__tests__/login.js",
+		"tests/integration/auth.go",
+		"internal/git/testdata/diff.txt",
+	}
+
+	for _, path := range tests {
+		t.Run(path, func(t *testing.T) {
+			if got := classifyFileType(path); got != 1 {
+				t.Fatalf("classifyFileType(%q) = %d, want 1", path, got)
+			}
+		})
+	}
+}
+
 func newFileDiff(path string, addedLine string) string {
 	return fmt.Sprintf(`diff --git a/%[1]s b/%[1]s
 new file mode 100644
