@@ -30,4 +30,3 @@ func (g *Generator) Generate(diff *git.DiffResult, detail string, lang string) (
 
 	return messages, nil
 }
-// Add language support

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -39,7 +40,7 @@ func NewSelector(lang string) *Selector {
 // Select는 사용자에게 후보 메시지들을 보여주고 선택을 받습니다.
 func (s *Selector) Select(messages []string, prevMessage string) (string, error) {
 	if len(messages) == 0 {
-		return "", fmt.Errorf(s.getMessage("error_no_candidates"))
+		return "", errors.New(s.getMessage("error_no_candidates"))
 	}
 
 	fmt.Println("\n" + s.getMessage("header_candidates"))
@@ -69,7 +70,7 @@ func (s *Selector) Select(messages []string, prevMessage string) (string, error)
 
 		// 종료
 		if choice == "q" || choice == "Q" {
-			return "", fmt.Errorf(s.getMessage("error_user_quit"))
+			return "", errors.New(s.getMessage("error_user_quit"))
 		}
 
 		// 이전 메시지 사용
@@ -266,5 +267,3 @@ func (s *Selector) displayFormattedMessage(index int, msg string) {
 		}
 	}
 }
-
-// Add structured format for high detail level

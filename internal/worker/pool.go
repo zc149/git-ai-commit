@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"bufio"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -17,6 +16,7 @@ var (
 
 // FileDiff는 단일 파일의 diff 정보를 담습니다.
 type FileDiff struct {
+	Index  int    // 원본 diff 내 파일 순서
 	Header string // diff 헤더 라인
 	Body   string // 파일의 diff 내용
 }
@@ -30,24 +30,29 @@ type ParsedFile struct {
 	Changes   string // 변경된 내용
 }
 
+type parsedFileResult struct {
+	index int
+	file  ParsedFile
+}
+
 // WorkerPool은 병렬로 diff를 파싱하는 worker pool입니다.
 type WorkerPool struct {
-	workers    int
-	input      chan FileDiff
-	output     chan ParsedFile
-	wg         sync.WaitGroup
-	fileMap    map[int]ParsedFile // 순서 보장을 위한 맵
-	resultLock sync.Mutex
-	fileCount  int
+	workers int
+	input   chan FileDiff
+	output  chan parsedFileResult
+	wg      sync.WaitGroup
 }
 
 // NewWorkerPool은 새로운 WorkerPool을 생성합니다.
 func NewWorkerPool(workers int) *WorkerPool {
+	if workers < 1 {
+		workers = 1
+	}
+
 	return &WorkerPool{
 		workers: workers,
 		input:   make(chan FileDiff, workers*2),
-		output:  make(chan ParsedFile, workers*2),
-		fileMap: make(map[int]ParsedFile),
+		output:  make(chan parsedFileResult, workers*2),
 	}
 }
 
@@ -65,21 +70,28 @@ func (p *WorkerPool) worker(id int) {
 
 	for fileDiff := range p.input {
 		result := p.parseFileDiff(fileDiff)
-		p.output <- result
+		p.output <- parsedFileResult{
+			index: fileDiff.Index,
+			file:  result,
+		}
 	}
 }
 
 // parseFileDiff는 단일 파일의 diff를 파싱합니다.
 func (p *WorkerPool) parseFileDiff(fileDiff FileDiff) ParsedFile {
-	// 헤더에서 경로 추출
-	path, isNew, isDeleted := p.parseHeader(fileDiff.Header)
+	metadata := fileDiff.Header
+	if fileDiff.Body != "" {
+		metadata += "\n" + fileDiff.Body
+	}
+
+	path, isNew, isDeleted := p.parseHeader(metadata)
 
 	return ParsedFile{
 		Path:      path,
 		FileType:  classifyFileType(path),
 		IsNew:     isNew,
 		IsDeleted: isDeleted,
-		Changes:   fileDiff.Body,
+		Changes:   removeFileStatusLines(fileDiff.Body),
 	}
 }
 
@@ -92,9 +104,14 @@ func (p *WorkerPool) parseHeader(header string) (path string, isNew, isDeleted b
 
 		// 파일 경로 추출
 		if strings.HasPrefix(line, "diff --git") {
-			parts := strings.Fields(line)
-			if len(parts) >= 4 {
-				path = strings.TrimPrefix(parts[3], "b/")
+			if parsedPath := parseDiffGitPath(line); parsedPath != "" {
+				path = parsedPath
+			}
+		}
+
+		if strings.HasPrefix(line, "--- ") || strings.HasPrefix(line, "+++ ") {
+			if parsedPath := parseMetadataPath(line); parsedPath != "" {
+				path = parsedPath
 			}
 		}
 
@@ -112,9 +129,38 @@ func (p *WorkerPool) parseHeader(header string) (path string, isNew, isDeleted b
 	return path, isNew, isDeleted
 }
 
+func parseDiffGitPath(line string) string {
+	const marker = " b/"
+	index := strings.LastIndex(line, marker)
+	if index == -1 {
+		return ""
+	}
+	return normalizeDiffPath(line[index+len(marker)-2:])
+}
+
+func parseMetadataPath(line string) string {
+	if len(line) < 5 {
+		return ""
+	}
+	return normalizeDiffPath(strings.TrimSpace(line[4:]))
+}
+
+func normalizeDiffPath(path string) string {
+	path = strings.TrimSpace(path)
+	path = strings.Trim(path, `"`)
+
+	if path == "" || path == "/dev/null" {
+		return ""
+	}
+	if strings.HasPrefix(path, "a/") || strings.HasPrefix(path, "b/") {
+		return path[2:]
+	}
+	return path
+}
+
 // Submit은 작업을 제출합니다.
 func (p *WorkerPool) Submit(fileDiff FileDiff, index int) {
-	p.fileCount = index + 1
+	fileDiff.Index = index
 	p.input <- fileDiff
 }
 
@@ -131,10 +177,21 @@ func (p *WorkerPool) Wait() {
 
 // Results는 모든 결과를 수집하여 반환합니다.
 func (p *WorkerPool) Results() []ParsedFile {
-	results := make([]ParsedFile, 0, p.fileCount)
+	filesByIndex := make(map[int]ParsedFile)
+	maxIndex := -1
 
 	for result := range p.output {
-		results = append(results, result)
+		filesByIndex[result.index] = result.file
+		if result.index > maxIndex {
+			maxIndex = result.index
+		}
+	}
+
+	results := make([]ParsedFile, 0, maxIndex+1)
+	for index := 0; index <= maxIndex; index++ {
+		if file, ok := filesByIndex[index]; ok {
+			results = append(results, file)
+		}
 	}
 
 	return results
@@ -183,16 +240,12 @@ func ParseDiffParallel(diff string, workers int) ([]ParsedFile, error) {
 
 // splitFileDiffs는 diff를 파일 단위로 분리합니다.
 func splitFileDiffs(diff string) []FileDiff {
-	scanner := bufio.NewScanner(strings.NewReader(diff))
-
 	var fileDiffs []FileDiff
 	var currentDiff FileDiff
 	var bodyLines []string
 	var inDiff bool
 
-	for scanner.Scan() {
-		line := scanner.Text()
-
+	for _, line := range strings.Split(diff, "\n") {
 		// 새 파일 헤더 감지
 		if strings.HasPrefix(line, "diff --git") {
 			// 이전 파일이 있다면 저장
@@ -217,6 +270,18 @@ func splitFileDiffs(diff string) []FileDiff {
 	}
 
 	return fileDiffs
+}
+
+func removeFileStatusLines(body string) string {
+	var lines []string
+	for _, line := range strings.Split(body, "\n") {
+		if strings.HasPrefix(line, "new file mode") ||
+			strings.HasPrefix(line, "deleted file mode") {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // init는 패키지 초기화 시 파일 타입 분류용 Map을 생성합니다.

@@ -9,6 +9,7 @@ dist/
 .env
 
 # Go 빌드 관련
+.gocache/
 *.exe
 *.exe~
 *.dll
