@@ -1,7 +1,6 @@
 package git
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
@@ -136,10 +135,9 @@ func convertParsedFiles(parsedFiles []worker.ParsedFile) []FileChange {
 // estimateFileCount는 diff에서 대략적인 파일 수를 추정합니다.
 func estimateFileCount(diff string) int {
 	count := 0
-	scanner := bufio.NewScanner(strings.NewReader(diff))
 
-	for scanner.Scan() {
-		if strings.HasPrefix(scanner.Text(), "diff --git") {
+	for _, line := range strings.Split(diff, "\n") {
+		if strings.HasPrefix(line, "diff --git") {
 			count++
 		}
 	}
@@ -153,13 +151,10 @@ func ParseDiff(diff string) (*DiffResult, error) {
 		Files: []FileChange{},
 	}
 
-	scanner := bufio.NewScanner(strings.NewReader(diff))
 	var currentFile *FileChange
 	var lines []string
 
-	for scanner.Scan() {
-		line := scanner.Text()
-
+	for _, line := range strings.Split(diff, "\n") {
 		// 새 파일 헤더 감지
 		if strings.HasPrefix(line, "diff --git") {
 			// 이전 파일이 있다면 저장
@@ -170,9 +165,8 @@ func ParseDiff(diff string) (*DiffResult, error) {
 			}
 
 			// 새 파일 정보 추출
-			parts := strings.Fields(line)
-			if len(parts) >= 4 {
-				path := strings.TrimPrefix(parts[3], "b/")
+			path := parseDiffGitPath(line)
+			if path != "" {
 				currentFile = &FileChange{
 					Path:      path,
 					FileType:  ClassifyFileType(path),
@@ -181,6 +175,13 @@ func ParseDiff(diff string) (*DiffResult, error) {
 				}
 			}
 			continue
+		}
+
+		if currentFile != nil && (strings.HasPrefix(line, "--- ") || strings.HasPrefix(line, "+++ ")) {
+			if path := parseMetadataPath(line); path != "" {
+				currentFile.Path = path
+				currentFile.FileType = ClassifyFileType(path)
+			}
 		}
 
 		// 새 파일 표시
@@ -212,6 +213,35 @@ func ParseDiff(diff string) (*DiffResult, error) {
 	}
 
 	return result, nil
+}
+
+func parseDiffGitPath(line string) string {
+	const marker = " b/"
+	index := strings.LastIndex(line, marker)
+	if index == -1 {
+		return ""
+	}
+	return normalizeDiffPath(line[index+len(marker)-2:])
+}
+
+func parseMetadataPath(line string) string {
+	if len(line) < 5 {
+		return ""
+	}
+	return normalizeDiffPath(strings.TrimSpace(line[4:]))
+}
+
+func normalizeDiffPath(path string) string {
+	path = strings.TrimSpace(path)
+	path = strings.Trim(path, `"`)
+
+	if path == "" || path == "/dev/null" {
+		return ""
+	}
+	if strings.HasPrefix(path, "a/") || strings.HasPrefix(path, "b/") {
+		return path[2:]
+	}
+	return path
 }
 
 // ClassifyFileType은 파일 경로에서 파일 타입을 결정합니다.
