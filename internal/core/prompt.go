@@ -35,6 +35,12 @@ func GeneratePrompt(diff *git.DiffResult, detail string, lang string) string {
 
 	builder.WriteString("\n")
 
+	analysis := diff.Analysis
+	if analysis.TotalFiles == 0 && len(diff.Files) > 0 {
+		analysis = git.AnalyzeFiles(diff.Files)
+	}
+	appendAnalysisSummary(&builder, analysis, lang)
+
 	// 변경 패턴 분석
 	changePattern := analyzeChangePattern(diff.Files, lang)
 	if changePattern != "" {
@@ -182,6 +188,69 @@ func GeneratePrompt(diff *git.DiffResult, detail string, lang string) string {
 	}
 
 	return builder.String()
+}
+
+func appendAnalysisSummary(builder *strings.Builder, analysis git.DiffAnalysis, lang string) {
+	if analysis.TotalFiles == 0 {
+		return
+	}
+
+	if lang == "ko" {
+		builder.WriteString("분석 요약:\n")
+		builder.WriteString(fmt.Sprintf("- 파일: 총 %d개 (소스 %d, 테스트 %d, 문서 %d, 설정 %d, 의존성 %d)\n",
+			analysis.TotalFiles, analysis.SourceFiles, analysis.TestFiles, analysis.DocFiles, analysis.ConfigFiles, analysis.DependencyFiles))
+		builder.WriteString(fmt.Sprintf("- 라인: +%d / -%d\n", analysis.AddedLines, analysis.DeletedLines))
+		if len(analysis.Signals) > 0 {
+			builder.WriteString(fmt.Sprintf("- 감지 신호: %s\n", strings.Join(analysis.Signals, ", ")))
+		}
+		if len(analysis.TypeScores) > 0 {
+			builder.WriteString("- 타입 점수:\n")
+			for _, score := range topTypeScores(analysis.TypeScores, 3) {
+				builder.WriteString(fmt.Sprintf("  - %s: %d", score.Type, score.Score))
+				if len(score.Reasons) > 0 {
+					builder.WriteString(fmt.Sprintf(" (%s)", strings.Join(score.Reasons, "; ")))
+				}
+				builder.WriteString("\n")
+			}
+		}
+		builder.WriteString("\n")
+		return
+	}
+
+	builder.WriteString("Analysis summary:\n")
+	builder.WriteString(fmt.Sprintf("- Files: %d total (source %d, test %d, docs %d, config %d, deps %d)\n",
+		analysis.TotalFiles, analysis.SourceFiles, analysis.TestFiles, analysis.DocFiles, analysis.ConfigFiles, analysis.DependencyFiles))
+	builder.WriteString(fmt.Sprintf("- Lines: +%d / -%d\n", analysis.AddedLines, analysis.DeletedLines))
+	if len(analysis.Signals) > 0 {
+		builder.WriteString(fmt.Sprintf("- Detected signals: %s\n", strings.Join(analysis.Signals, ", ")))
+	}
+	if len(analysis.TypeScores) > 0 {
+		builder.WriteString("- Type scores:\n")
+		for _, score := range topTypeScores(analysis.TypeScores, 3) {
+			builder.WriteString(fmt.Sprintf("  - %s: %d", score.Type, score.Score))
+			if len(score.Reasons) > 0 {
+				builder.WriteString(fmt.Sprintf(" (%s)", strings.Join(score.Reasons, "; ")))
+			}
+			builder.WriteString("\n")
+		}
+	}
+	builder.WriteString("\n")
+}
+
+func topTypeScores(scores []git.CommitTypeScore, limit int) []git.CommitTypeScore {
+	var positiveScores []git.CommitTypeScore
+	for _, score := range scores {
+		if score.Score > 0 {
+			positiveScores = append(positiveScores, score)
+		}
+	}
+	if len(positiveScores) == 0 {
+		positiveScores = scores
+	}
+	if len(positiveScores) <= limit {
+		return positiveScores
+	}
+	return positiveScores[:limit]
 }
 
 // summarizeChanges는 diff 변경 내용을 요약합니다.

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -46,16 +47,19 @@ func (ft FileType) String() string {
 
 // FileChange는 단일 파일의 변경 정보를 담습니다.
 type FileChange struct {
-	Path      string   // 파일 경로
-	FileType  FileType // 파일 타입
-	IsNew     bool     // 새 파일 여부
-	IsDeleted bool     // 삭제된 파일 여부
-	Changes   string   // 변경된 내용 (diff 내용)
+	Path         string   // 파일 경로
+	FileType     FileType // 파일 타입
+	IsNew        bool     // 새 파일 여부
+	IsDeleted    bool     // 삭제된 파일 여부
+	AddedLines   int      // 추가된 라인 수
+	DeletedLines int      // 삭제된 라인 수
+	Changes      string   // 변경된 내용 (diff 내용)
 }
 
 // DiffResult는 파싱된 diff 결과를 담습니다.
 type DiffResult struct {
 	Files      []FileChange // 변경된 파일 목록
+	Analysis   DiffAnalysis // 구조화된 변경 분석 결과
 	CommitType string       // 추론된 커밋 타입
 	Scopes     []string     // 추론된 scope 목록
 	RawDiff    string       // 원본 diff 문자열
@@ -111,7 +115,8 @@ func GetCachedDiff() (*DiffResult, error) {
 		result.RawDiff = rawDiff
 	}
 
-	result.CommitType = InferCommitType(result.Files)
+	result.Analysis = AnalyzeFiles(result.Files)
+	result.CommitType = result.Analysis.RecommendedType()
 	result.Scopes = InferScopes(result.Files)
 
 	return result, nil
@@ -121,12 +126,15 @@ func GetCachedDiff() (*DiffResult, error) {
 func convertParsedFiles(parsedFiles []worker.ParsedFile) []FileChange {
 	files := make([]FileChange, len(parsedFiles))
 	for i, pf := range parsedFiles {
+		addedLines, deletedLines := countChangedLines(pf.Changes)
 		files[i] = FileChange{
-			Path:      pf.Path,
-			FileType:  FileType(pf.FileType),
-			IsNew:     pf.IsNew,
-			IsDeleted: pf.IsDeleted,
-			Changes:   pf.Changes,
+			Path:         pf.Path,
+			FileType:     FileType(pf.FileType),
+			IsNew:        pf.IsNew,
+			IsDeleted:    pf.IsDeleted,
+			AddedLines:   addedLines,
+			DeletedLines: deletedLines,
+			Changes:      pf.Changes,
 		}
 	}
 	return files
@@ -159,8 +167,7 @@ func ParseDiff(diff string) (*DiffResult, error) {
 		if strings.HasPrefix(line, "diff --git") {
 			// 이전 파일이 있다면 저장
 			if currentFile != nil {
-				currentFile.Changes = strings.Join(lines, "\n")
-				result.Files = append(result.Files, *currentFile)
+				result.Files = append(result.Files, finalizeFileChange(currentFile, lines))
 				lines = []string{}
 			}
 
@@ -208,11 +215,16 @@ func ParseDiff(diff string) (*DiffResult, error) {
 
 	// 마지막 파일 저장
 	if currentFile != nil {
-		currentFile.Changes = strings.Join(lines, "\n")
-		result.Files = append(result.Files, *currentFile)
+		result.Files = append(result.Files, finalizeFileChange(currentFile, lines))
 	}
 
 	return result, nil
+}
+
+func finalizeFileChange(file *FileChange, lines []string) FileChange {
+	file.Changes = strings.Join(lines, "\n")
+	file.AddedLines, file.DeletedLines = countChangedLines(file.Changes)
+	return *file
 }
 
 func parseDiffGitPath(line string) string {
@@ -296,118 +308,7 @@ func ClassifyFileType(path string) FileType {
 
 // InferCommitType은 파일 변화를 기반으로 커밋 타입을 추론합니다.
 func InferCommitType(files []FileChange) string {
-	if len(files) == 0 {
-		return "chore"
-	}
-
-	// 파일 유형별 가중치 점수
-	typeScore := make(map[string]int)
-	typeScore["feat"] = 0
-	typeScore["fix"] = 0
-	typeScore["build"] = 0
-	typeScore["docs"] = 0
-	typeScore["test"] = 0
-	typeScore["refactor"] = 0
-	typeScore["chore"] = 0
-
-	sourceFileCount := 0
-	newSourceFileCount := 0
-	modifiedSourceFileCount := 0
-	newDirectories := make(map[string]bool)
-
-	hasDependencyFile := false
-	hasRegularConfig := false
-
-	for _, file := range files {
-		path := file.Path
-		parts := strings.Split(filepath.Clean(path), string(filepath.Separator))
-
-		// 새 디렉토리 감지
-		if len(parts) >= 2 && file.IsNew {
-			dir := strings.Join(parts[:len(parts)-1], string(filepath.Separator))
-			newDirectories[dir] = true
-		}
-
-		switch file.FileType {
-		case FileTypeSource:
-			sourceFileCount++
-			if file.IsNew {
-				newSourceFileCount++
-				// 새 소스 파일 추가는 feat에 매우 강력한 점수
-				typeScore["feat"] += 15
-			} else if !file.IsDeleted {
-				modifiedSourceFileCount++
-				typeScore["refactor"] += 10
-				typeScore["fix"] += 5
-			}
-
-		case FileTypeTest:
-			if file.IsNew {
-				typeScore["test"] += 8
-			} else {
-				typeScore["test"] += 3
-			}
-
-		case FileTypeDoc:
-			typeScore["docs"] += 3
-
-		case FileTypeConfig:
-			if isDependencyFile(path) {
-				hasDependencyFile = true
-				// 의존성 변경 점수는 낮게 설정 (소스 파일이 우선)
-				typeScore["build"] += 2
-			} else {
-				hasRegularConfig = true
-				// 일반 설정 점수도 낮게 설정
-				typeScore["chore"] += 2
-			}
-		}
-	}
-
-	// 새 디렉토리가 2개 이상 = 새 기능 추가 (가중치 증가)
-	if len(newDirectories) >= 2 {
-		typeScore["feat"] += 30
-	}
-
-	// 새 소스 파일이 2개 이상 = 새 기능 (임계값 낮춤, 가중치 증가)
-	if newSourceFileCount >= 2 {
-		typeScore["feat"] += 30
-	}
-
-	// 의존성 파일만 변경됨 (소스 파일이 없는 경우) = build
-	if hasDependencyFile && sourceFileCount == 0 && !hasRegularConfig {
-		typeScore["build"] += 15
-		typeScore["chore"] -= 5
-	}
-
-	// 일반 설정 파일만 변경됨 (소스 파일이 없는 경우) = chore
-	if hasRegularConfig && sourceFileCount == 0 && !hasDependencyFile {
-		typeScore["chore"] += 15
-		typeScore["build"] -= 5
-	}
-
-	// 소스 파일이 있는 경우: 의존성/설정 변경은 무시하고 소스 파일 유형 우선
-	// 새 소스 파일이 있으면 무조건 feat
-	if newSourceFileCount > 0 {
-		typeScore["feat"] += 50
-		typeScore["build"] -= 20
-		typeScore["chore"] -= 20
-	}
-
-	// 최대 점수 타입 선택
-	maxScore := 0
-	var bestType string
-	for commitType, score := range typeScore {
-		if score > maxScore {
-			maxScore = score
-			bestType = commitType
-		}
-	}
-
-	if bestType == "" {
-		return "chore"
-	}
-	return bestType
+	return AnalyzeFiles(files).RecommendedType()
 }
 
 // init는 패키지 초기화 시 의존성 파일 Map을 생성합니다.
@@ -548,8 +449,10 @@ func InferScopes(files []FileChange) []string {
 
 	// 3. 소스 파일이 없는 경우: 다른 파일 유형으로 scope 결정
 	if len(dependencyFiles) > 0 {
-		// 의존성 파일만 있는 경우
-		return inferScopeFromConfigFiles(append(dependencyFiles, configFiles...))
+		if len(configFiles) == 0 {
+			return []string{"deps"}
+		}
+		return []string{"config"}
 	}
 
 	if len(configFiles) > 0 {
@@ -596,15 +499,27 @@ func inferScopeFromSourceFiles(sourceFiles []FileChange) []string {
 	} else {
 		// 소스 파일이 가장 많은 최상위 디렉토리 선택
 		maxCount := 0
-		var primaryDir string
-		for dir, count := range topLevelDirs {
+		var primaryDirs []string
+
+		dirs := make([]string, 0, len(topLevelDirs))
+		for dir := range topLevelDirs {
+			dirs = append(dirs, dir)
+		}
+		sort.Strings(dirs)
+
+		for _, dir := range dirs {
+			count := topLevelDirs[dir]
 			if count > maxCount {
 				maxCount = count
-				primaryDir = dir
+				primaryDirs = []string{dir}
+			} else if count == maxCount {
+				primaryDirs = append(primaryDirs, dir)
 			}
 		}
-		if primaryDir != "" {
-			scopes = append(scopes, simplifyScopeName(primaryDir))
+		if len(primaryDirs) == 1 {
+			scopes = append(scopes, simplifyScopeName(primaryDirs[0]))
+		} else if len(primaryDirs) > 1 {
+			scopes = append(scopes, "multiple")
 		}
 	}
 
@@ -630,6 +545,9 @@ func inferScopeFromConfigFiles(configFiles []FileChange) []string {
 	// 하나의 최상위 디렉토리만 있으면 그걸 사용
 	if len(topLevelDirs) == 1 {
 		for dir := range topLevelDirs {
+			if !isDirectoryName(dir) {
+				return []string{"config"}
+			}
 			return []string{simplifyScopeName(dir)}
 		}
 	}
@@ -660,7 +578,12 @@ func findCommonPrefix(files []FileChange) string {
 
 	paths := make([][]string, len(files))
 	for i, file := range files {
-		paths[i] = strings.Split(filepath.Clean(file.Path), string(filepath.Separator))
+		dir := filepath.Dir(filepath.Clean(file.Path))
+		if dir == "." {
+			paths[i] = []string{}
+			continue
+		}
+		paths[i] = strings.Split(dir, string(filepath.Separator))
 	}
 
 	common := paths[0]
@@ -671,11 +594,8 @@ func findCommonPrefix(files []FileChange) string {
 		}
 	}
 
-	// 마지막이 파일 이름인 경우 제거
-	if len(common) > 1 {
-		return strings.Join(common[:len(common)-1], "/")
-	} else if len(common) == 1 && isDirectoryName(common[0]) {
-		return common[0]
+	if len(common) > 0 {
+		return strings.Join(common, "/")
 	}
 	return ""
 }
@@ -719,14 +639,21 @@ func isDirectoryName(name string) bool {
 
 // simplifyScopeName은 scope 이름을 단순화합니다.
 func simplifyScopeName(scope string) string {
+	scope = filepath.ToSlash(filepath.Clean(scope))
+	parts := strings.Split(scope, "/")
+	if len(parts) > 1 {
+		scope = parts[len(parts)-1]
+	}
+
+	if ext := filepath.Ext(scope); ext != "" {
+		scope = strings.TrimSuffix(scope, ext)
+	}
+
 	// 너무 긴 scope는 줄이기
 	if len(scope) > 20 {
-		parts := strings.Split(scope, "/")
-		if len(parts) > 1 {
-			return parts[len(parts)-1] // 마지막 부분만
-		}
 		return scope[:20]
 	}
+
 	return scope
 }
 
